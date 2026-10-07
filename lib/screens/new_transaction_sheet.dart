@@ -5,6 +5,7 @@ import 'package:gap/gap.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/theme/app_palette.dart';
+import '../core/utils/duplicates.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/receipt_scan.dart';
 import '../core/utils/wallet.dart';
@@ -143,11 +144,38 @@ class _NewTransactionSheetState extends ConsumerState<NewTransactionSheet> {
       return;
     }
 
+    final title = _title.text.trim();
+    final amount = double.parse(_amount.text.replaceAll(',', '.'));
+    // The same receipt scanned twice, or a double tap: ask before saving.
+    if (!_editing && _repeat == null) {
+      final duplicate = findLikelyDuplicate(
+        existing:
+            ref.read(transactionsProvider(null)).value ?? const <Transaction>[],
+        type: _type,
+        amount: amount,
+        date: _date,
+        title: title,
+        reference: _reference,
+      );
+      if (duplicate != null) {
+        final again = await confirmAction(
+          context,
+          title: '¿Registrarlo de nuevo?',
+          message:
+              'Ya tienes "${duplicate.title}" por '
+              '${Formatters.compactMoney(duplicate.amount)} '
+              '(${Formatters.dayLabel(duplicate.date).toLowerCase()}). '
+              'Puede ser el mismo ticket.',
+          confirmLabel: 'Registrar igual',
+          destructive: false,
+        );
+        if (!again || !mounted) return;
+      }
+    }
+
     setState(() => _saving = true);
     final messenger = ScaffoldMessenger.of(context);
     final service = ref.read(transactionServiceProvider);
-    final title = _title.text.trim();
-    final amount = double.parse(_amount.text.replaceAll(',', '.'));
     final paymentMethodId = _methodFor(
       ref.read(paymentMethodsProvider).value ?? const [],
     );

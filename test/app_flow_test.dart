@@ -394,6 +394,21 @@ void main() {
     expect(saved.category.id, food.id, reason: 'suggested from the name');
     expect(saved.reference, '9F3A1C2B-0D4E-4F5A-8B6C-7D8E9F0A1B2C');
     expect(saved.date.day, yesterday.day);
+
+    // Scanning the same receipt again asks before saving it twice.
+    final count = backend.transactions.length;
+    await tester.tap(find.byTooltip('Registrar movimiento'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Escanear factura o ticket'));
+    await tester.pumpAndSettle();
+    await scrollTo(tester, find.text('Guardar gasto'));
+    await tester.tap(find.text('Guardar gasto'));
+    await tester.pumpAndSettle();
+    expect(find.text('¿Registrarlo de nuevo?'), findsOneWidget);
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    expect(backend.transactions, hasLength(count));
+    expect(find.text('Guardar gasto'), findsOneWidget, reason: 'still editing');
   });
 
   testWidgets('an invoice QR without amount asks for it', (tester) async {
