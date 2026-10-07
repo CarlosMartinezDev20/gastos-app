@@ -17,6 +17,7 @@ import '../widgets/mascot.dart';
 import 'category_sheet.dart';
 import 'new_transaction_sheet.dart';
 import '../core/theme/motion.dart';
+import '../widgets/payment_method_picker.dart';
 
 /// Weekly and monthly movements the API creates on its own.
 class RecurringScreen extends ConsumerWidget {
@@ -284,6 +285,7 @@ class _RecurringSheetState extends ConsumerState<_RecurringSheet> {
     text: widget.rule.amount.toStringAsFixed(2),
   );
   late RecurrenceFrequency _frequency = widget.rule.frequency;
+  late String? _paymentMethodId = widget.rule.paymentMethodId;
   bool _saving = false;
   String? _error;
 
@@ -320,6 +322,8 @@ class _RecurringSheetState extends ConsumerState<_RecurringSheet> {
             title: _title.text.trim(),
             amount: double.parse(_amount.text.replaceAll(',', '.')),
             frequency: _frequency,
+            setPaymentMethod: true,
+            paymentMethodId: _paymentMethodId,
           ),
     );
   }
@@ -395,6 +399,19 @@ class _RecurringSheetState extends ConsumerState<_RecurringSheet> {
                   RecurrenceFrequency.weekly: 'Cada semana',
                   RecurrenceFrequency.monthly: 'Cada mes',
                 },
+              ),
+              const SizedBox(height: 16),
+              Text(
+                widget.rule.type == TransactionType.income
+                    ? 'Recibido en'
+                    : 'Pagado con',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 8),
+              PaymentMethodPicker(
+                methods: ref.watch(paymentMethodsProvider).value ?? const [],
+                selected: _paymentMethodId,
+                onChanged: (id) => setState(() => _paymentMethodId = id),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 14),

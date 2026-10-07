@@ -24,6 +24,7 @@ class RecurringRule {
     required this.frequency,
     required this.nextDate,
     required this.active,
+    this.paymentMethodId,
   });
 
   final String id;
@@ -37,6 +38,9 @@ class RecurringRule {
   final DateTime nextDate;
   final bool active;
 
+  /// Copied to each movement it creates.
+  final String? paymentMethodId;
+
   factory RecurringRule.fromJson(Map<String, dynamic> json) => RecurringRule(
     id: json['id'] as String,
     title: json['title'] as String,
@@ -46,5 +50,6 @@ class RecurringRule {
     frequency: RecurrenceFrequencyApi.fromApi(json['frequency'] as String),
     nextDate: DateTime.parse(json['nextDate'] as String),
     active: json['active'] as bool,
+    paymentMethodId: json['paymentMethodId'] as String?,
   );
 }

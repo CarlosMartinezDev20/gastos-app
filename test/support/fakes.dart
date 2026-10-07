@@ -266,6 +266,7 @@ class FakeFinanceRepository implements FinanceRepository {
     required String categoryId,
     required RecurrenceFrequency frequency,
     required DateTime startDate,
+    String? paymentMethodId,
   }) async {
     final id = 'r${backend.recurring.length + 1}';
     final category = backend.category(categoryId);
@@ -281,6 +282,7 @@ class FakeFinanceRepository implements FinanceRepository {
           date: startDate,
           category: category,
           recurringId: id,
+          paymentMethodId: paymentMethodId,
         ),
       );
     }
@@ -297,6 +299,7 @@ class FakeFinanceRepository implements FinanceRepository {
                 : DateTime(startDate.year, startDate.month + 1, startDate.day))
           : startDate,
       active: true,
+      paymentMethodId: paymentMethodId,
     );
     backend.recurring.add(rule);
     backend.calls.add('createRecurring:$title:${frequency.name}');
@@ -310,6 +313,8 @@ class FakeFinanceRepository implements FinanceRepository {
     double? amount,
     RecurrenceFrequency? frequency,
     bool? active,
+    bool setPaymentMethod = false,
+    String? paymentMethodId,
   }) async {
     final index = backend.recurring.indexWhere((r) => r.id == id);
     final old = backend.recurring[index];
@@ -322,6 +327,7 @@ class FakeFinanceRepository implements FinanceRepository {
       frequency: frequency ?? old.frequency,
       nextDate: old.nextDate,
       active: active ?? old.active,
+      paymentMethodId: setPaymentMethod ? paymentMethodId : old.paymentMethodId,
     );
     backend.recurring[index] = rule;
     backend.calls.add('updateRecurring:$id');

@@ -19,9 +19,8 @@ import '../services/transaction_service.dart';
 import '../widgets/app_states.dart';
 import '../widgets/icon_mapper.dart';
 import '../widgets/ios_ui.dart';
-import '../widgets/wallet_card.dart';
+import '../widgets/payment_method_picker.dart';
 import 'category_sheet.dart';
-import 'payment_method_sheet.dart';
 import '../core/theme/motion.dart';
 
 /// Opens the form to register a movement, or to edit [transaction] when given.
@@ -202,6 +201,7 @@ class _NewTransactionSheetState extends ConsumerState<NewTransactionSheet> {
               categoryId: _categoryId!,
               frequency: frequency,
               startDate: _date,
+              paymentMethodId: paymentMethodId,
             );
       } else {
         await service.create(
@@ -464,25 +464,23 @@ class _NewTransactionSheetState extends ConsumerState<NewTransactionSheet> {
                     );
                   },
                 ),
-                // A recurring rule doesn't keep a payment method yet.
-                if (_repeat == null) ...[
-                  const Gap(18),
-                  Text(
-                    isIncome ? 'Recibido en' : 'Pagado con',
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const Gap(10),
-                  _PaymentMethodPicker(
-                    methods: methods,
-                    selected: _methodFor(methods),
-                    onChanged: (id) => setState(() {
-                      _methodPicked = true;
-                      _paymentMethodId = id;
-                    }),
-                  ),
-                ],
+
+                const Gap(18),
+                Text(
+                  isIncome ? 'Recibido en' : 'Pagado con',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w900),
+                ),
+                const Gap(10),
+                PaymentMethodPicker(
+                  methods: methods,
+                  selected: _methodFor(methods),
+                  onChanged: (id) => setState(() {
+                    _methodPicked = true;
+                    _paymentMethodId = id;
+                  }),
+                ),
                 const Gap(16),
                 Material(
                   color: Theme.of(
@@ -592,57 +590,6 @@ class _NewTransactionSheetState extends ConsumerState<NewTransactionSheet> {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// The wallet's methods as chips (tap the selected one to clear it), and a
-/// chip to add one without leaving the form; it comes back selected.
-class _PaymentMethodPicker extends StatelessWidget {
-  const _PaymentMethodPicker({
-    required this.methods,
-    required this.selected,
-    required this.onChanged,
-  });
-
-  final List<PaymentMethod> methods;
-  final String? selected;
-  final ValueChanged<String?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        for (final method in methods)
-          ChoiceChip(
-            avatar: Container(
-              width: 16,
-              height: 16,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: walletCardStyle(method.color).colors,
-                ),
-              ),
-            ),
-            label: Text(method.shortLabel),
-            selected: selected == method.id,
-            onSelected: (on) => onChanged(on ? method.id : null),
-          ),
-        ActionChip(
-          avatar: const Icon(Icons.add, size: 18),
-          label: Text(
-            methods.isEmpty ? 'Agregar tarjeta o efectivo' : 'Agregar',
-          ),
-          tooltip: 'Agregar método de pago',
-          onPressed: () async {
-            final created = await showPaymentMethodSheet(context);
-            if (created != null) onChanged(created.id);
-          },
-        ),
-      ],
     );
   }
 }

@@ -872,6 +872,52 @@ void main() {
     expect(find.text('Nada se repite todavía'), findsOneWidget);
   });
 
+  testWidgets('a recurring rule pays with a wallet method', (tester) async {
+    final backend = await pumpApp(tester);
+    backend.paymentMethods.add(
+      const PaymentMethod(
+        id: 'pm1',
+        name: 'Débito',
+        kind: PaymentMethodKind.debitCard,
+        color: 'ocean',
+        last4: '0937',
+      ),
+    );
+    await tester.tap(find.byTooltip('Registrar movimiento'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Monto'), '9');
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Descripción'),
+      'Netflix',
+    );
+    await scrollTo(tester, find.text('Débito ··0937'));
+    await tester.tap(find.text('Débito ··0937'));
+    await tester.pumpAndSettle();
+    await scrollTo(tester, find.text('Cada mes'));
+    await tester.tap(find.text('Cada mes'));
+    await tester.pumpAndSettle();
+    await scrollTo(tester, find.text('Guardar gasto'));
+    await tester.tap(find.text('Guardar gasto'));
+    await tester.pumpAndSettle();
+    expect(backend.recurring.single.paymentMethodId, 'pm1');
+    expect(backend.transactions.last.paymentMethodId, 'pm1');
+
+    // Editing the rule can clear it.
+    await openProfile(tester);
+    await scrollTo(tester, find.text('Movimientos recurrentes'));
+    await tester.tap(find.text('Movimientos recurrentes'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Netflix'));
+    await tester.pumpAndSettle();
+    await scrollTo(tester, find.text('Débito ··0937'));
+    await tester.tap(find.text('Débito ··0937'));
+    await tester.pumpAndSettle();
+    await scrollTo(tester, find.text('Guardar cambios'));
+    await tester.tap(find.text('Guardar cambios'));
+    await tester.pumpAndSettle();
+    expect(backend.recurring.single.paymentMethodId, isNull);
+  });
+
   testWidgets('exports the movements as CSV', (tester) async {
     String? copied;
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(

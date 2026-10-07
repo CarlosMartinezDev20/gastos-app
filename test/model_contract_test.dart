@@ -70,6 +70,7 @@ void main() {
     expect(transaction.amount, 150);
 
     final rule = RecurringRule.fromJson({
+      'paymentMethodId': 'pm-1',
       'id': 'r1',
       'userId': 'user-1',
       'categoryId': 'cat-1',
@@ -89,6 +90,7 @@ void main() {
       },
     });
     expect(rule.frequency, RecurrenceFrequency.monthly);
+    expect(rule.paymentMethodId, 'pm-1');
 
     final generated = Transaction.fromJson({
       'id': 'tx-2',

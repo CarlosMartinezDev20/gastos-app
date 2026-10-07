@@ -136,6 +136,7 @@ class FinanceRepository {
     required String categoryId,
     required RecurrenceFrequency frequency,
     required DateTime startDate,
+    String? paymentMethodId,
   }) async {
     try {
       final response = await _api.dio.post(
@@ -147,6 +148,7 @@ class FinanceRepository {
           'categoryId': categoryId,
           'frequency': frequency.apiValue,
           'startDate': startDate.toUtc().toIso8601String(),
+          'paymentMethodId': ?paymentMethodId,
         },
       );
       return RecurringRule.fromJson(response.data as Map<String, dynamic>);
@@ -161,6 +163,9 @@ class FinanceRepository {
     double? amount,
     RecurrenceFrequency? frequency,
     bool? active,
+    // Sent (null clears it) only when true; other fields skip nulls.
+    bool setPaymentMethod = false,
+    String? paymentMethodId,
   }) async {
     try {
       final response = await _api.dio.patch(
@@ -170,6 +175,7 @@ class FinanceRepository {
           'amount': ?amount,
           'frequency': ?frequency?.apiValue,
           'active': ?active,
+          if (setPaymentMethod) 'paymentMethodId': paymentMethodId,
         },
       );
       return RecurringRule.fromJson(response.data as Map<String, dynamic>);
