@@ -8,6 +8,7 @@ import '../core/theme/motion.dart';
 import '../models/category.dart';
 import '../screens/new_transaction_sheet.dart';
 import 'ios_ui.dart';
+import 'offline_banner.dart';
 
 class _Tab {
   const _Tab(this.path, this.label, this.icon, this.selectedIcon);
@@ -59,14 +60,25 @@ class AppShell extends StatelessWidget {
         extendBody: true,
         body: SafeArea(
           bottom: false,
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: location.startsWith('/home') ? 1080 : 760,
+          child: Stack(
+            children: [
+              Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: location.startsWith('/home') ? 1080 : 760,
+                  ),
+                  child: child,
+                ),
               ),
-              child: child,
-            ),
+              // Over the page, not above it: showing it doesn't reflow.
+              const Positioned(
+                top: 8,
+                left: 16,
+                right: 16,
+                child: OfflineBanner(),
+              ),
+            ],
           ),
         ),
         bottomNavigationBar: KeyboardVisibilityBuilder(

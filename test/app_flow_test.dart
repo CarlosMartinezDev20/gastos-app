@@ -1,3 +1,4 @@
+import 'package:appgastos/core/network/api_client.dart';
 import 'package:appgastos/core/network/token_store.dart';
 import 'package:appgastos/core/theme/app_theme.dart';
 import 'package:appgastos/main.dart';
@@ -773,6 +774,31 @@ void main() {
     await tester.tap(reminderSwitch());
     await tester.pumpAndSettle();
     expect(reminders.scheduled, isEmpty, reason: 'turned off');
+  });
+
+  testWidgets('shows when the data on screen is saved, not live', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    final api = ProviderScope.containerOf(
+      tester.element(find.byType(MaterialApp)),
+    ).read(apiClientProvider);
+    expect(
+      find.text('Sin conexión · lo último guardado').hitTestable(),
+      findsNothing,
+    );
+
+    api.offline.value = true;
+    await tester.pumpAndSettle();
+    expect(find.text('Sin conexión · lo último guardado'), findsOneWidget);
+    expect(find.text('Reintentar'), findsOneWidget);
+
+    api.offline.value = false;
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Sin conexión · lo último guardado').hitTestable(),
+      findsNothing,
+    );
   });
 
   testWidgets('the cards widget on Inicio shows what is owed', (tester) async {
