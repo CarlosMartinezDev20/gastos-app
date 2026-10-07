@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/theme/app_theme.dart';
 import 'navigation/app_router.dart';
+import 'providers/payment_reminders_provider.dart';
 import 'providers/phone_widget_provider.dart';
 import 'providers/storage_provider.dart';
 import 'providers/theme_provider.dart';
@@ -34,6 +35,7 @@ class AppGastosApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeControllerProvider);
     ref.watch(phoneWidgetSyncProvider);
+    ref.watch(paymentRemindersSyncProvider);
     return MaterialApp.router(
       title: 'Finanzas M3',
       debugShowCheckedModeBanner: false,

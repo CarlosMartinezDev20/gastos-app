@@ -11,6 +11,7 @@ import '../widgets/app_states.dart';
 import '../widgets/ios_ui.dart';
 import '../widgets/theme_toggle.dart';
 import '../widgets/theme_crossfade.dart';
+import '../providers/payment_reminders_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -137,6 +138,31 @@ class ProfileScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
+                if (ref.watch(paymentReminderServiceProvider).supported)
+                  InsetTile(
+                    icon: CupertinoIcons.bell_fill,
+                    iconColor: const Color(0xFFE5484D),
+                    title: 'Recordatorios de pago',
+                    trailing: AppSwitch(
+                      value: ref.watch(paymentRemindersEnabledProvider),
+                      onChanged: (value) async {
+                        final messenger = ScaffoldMessenger.of(context);
+                        final on = await ref
+                            .read(paymentRemindersEnabledProvider.notifier)
+                            .set(value);
+                        if (value && !on) {
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Activa las notificaciones de la app en los '
+                                'ajustes del teléfono.',
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
                 InsetTile(
                   icon: CupertinoIcons.money_dollar_circle_fill,
                   iconColor: const Color(0xFF0E8A5F),

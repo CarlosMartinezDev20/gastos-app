@@ -1,6 +1,8 @@
 import 'package:appgastos/core/errors/api_exception.dart';
 import 'package:appgastos/core/utils/phone_widget.dart';
 import 'package:appgastos/services/phone_widget_service.dart';
+import 'package:appgastos/services/payment_reminder_service.dart';
+import 'package:appgastos/core/utils/payment_reminders.dart';
 import 'package:appgastos/models/auth_session.dart';
 import 'package:appgastos/models/budget.dart';
 import 'package:appgastos/models/category.dart';
@@ -706,4 +708,29 @@ class FakePhoneWidgetService extends PhoneWidgetService {
   @override
   Future<void> publish(PhoneWidgetPayload payload) async =>
       payloads.add(payload);
+}
+
+/// Records the reminders the app would schedule; permission is configurable.
+class FakePaymentReminderService implements PaymentReminderService {
+  FakePaymentReminderService({this.allow = true});
+
+  bool allow;
+  List<PlannedReminder> scheduled = const [];
+  int permissionRequests = 0;
+
+  @override
+  bool get supported => true;
+
+  @override
+  Future<bool> requestPermission() async {
+    permissionRequests++;
+    return allow;
+  }
+
+  @override
+  Future<void> schedule(List<PlannedReminder> reminders) async =>
+      scheduled = reminders;
+
+  @override
+  Future<void> cancelAll() async => scheduled = const [];
 }

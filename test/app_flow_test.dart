@@ -8,11 +8,13 @@ import 'package:appgastos/models/payment_method.dart';
 import 'package:appgastos/core/utils/budget_planner.dart';
 import 'package:appgastos/providers/auth_provider.dart';
 import 'package:appgastos/providers/finance_providers.dart';
+import 'package:appgastos/providers/payment_reminders_provider.dart';
 import 'package:appgastos/providers/phone_widget_provider.dart';
 import 'package:appgastos/widgets/phone_widget_preview.dart';
 import 'package:appgastos/providers/storage_provider.dart';
 import 'package:appgastos/services/receipt_scanner.dart';
 import 'package:appgastos/screens/category_sheet.dart';
+import 'package:appgastos/widgets/ios_ui.dart';
 import 'package:appgastos/widgets/mascot.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -34,6 +36,7 @@ Future<FakeBackend> pumpApp(
   bool withData = true,
   FakePhoneWidgetService? phoneWidget,
   ScanDraft? scan,
+  FakePaymentReminderService? reminders,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -61,6 +64,9 @@ Future<FakeBackend> pumpApp(
         ),
         // No camera in tests: the scanner "reads" [scan].
         scanLauncherProvider.overrideWithValue((_) async => scan),
+        paymentReminderServiceProvider.overrideWithValue(
+          reminders ?? FakePaymentReminderService(),
+        ),
       ],
       child: const AppGastosApp(),
     ),
@@ -716,6 +722,57 @@ void main() {
     await goToTab(tester, 'Metas');
     await goToTab(tester, 'Inicio');
     expect(find.text('••••••'), findsOneWidget);
+  });
+
+  testWidgets('payment reminders are scheduled once turned on', (tester) async {
+    final reminders = FakePaymentReminderService(allow: false);
+    final backend = await pumpApp(tester, reminders: reminders);
+    backend.paymentMethods.add(
+      PaymentMethod(
+        id: 'visa',
+        name: 'Visa',
+        kind: PaymentMethodKind.creditCard,
+        color: 'ink',
+        last4: '4821',
+        dueDay: DateTime.now().day == 28 ? 27 : 28,
+      ),
+    );
+    backend.transactions.add(
+      Transaction(
+        id: 'buy',
+        title: 'Zapatos',
+        amount: 60,
+        type: TransactionType.expense,
+        date: DateTime.now(),
+        category: food,
+        paymentMethodId: 'visa',
+      ),
+    );
+    await openProfile(tester);
+    await scrollTo(tester, find.text('Recordatorios de pago'));
+    Finder reminderSwitch() => find.descendant(
+      of: find.widgetWithText(InsetTile, 'Recordatorios de pago'),
+      matching: find.byType(CupertinoSwitch),
+    );
+
+    // Permission denied: stays off and says where to enable it.
+    await tester.tap(reminderSwitch());
+    await tester.pumpAndSettle();
+    expect(reminders.permissionRequests, 1);
+    expect(tester.widget<CupertinoSwitch>(reminderSwitch()).value, isFalse);
+    expect(find.textContaining('ajustes del teléfono'), findsOneWidget);
+    expect(reminders.scheduled, isEmpty);
+
+    reminders.allow = true;
+    await tester.tap(reminderSwitch());
+    await tester.pumpAndSettle();
+    expect(tester.widget<CupertinoSwitch>(reminderSwitch()).value, isTrue);
+    expect(reminders.scheduled, isNotEmpty);
+    expect(reminders.scheduled.last.title, 'Hoy vence tu Visa ··4821');
+
+    await tester.tap(reminderSwitch());
+    await tester.pumpAndSettle();
+    expect(reminders.scheduled, isEmpty, reason: 'turned off');
   });
 
   testWidgets('the cards widget on Inicio shows what is owed', (tester) async {
