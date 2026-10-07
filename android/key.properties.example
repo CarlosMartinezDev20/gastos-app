@@ -1,0 +1,9 @@
+# Copy to android/key.properties (ignored by git) to sign release builds.
+# Create the key once and keep a backup — losing it means you can't update
+# the app on Play Store:
+#   keytool -genkey -v -keystore ~/finanzas-release.jks -keyalg RSA \
+#     -keysize 2048 -validity 10000 -alias finanzas
+storeFile=/home/USUARIO/finanzas-release.jks
+storePassword=CAMBIAR
+keyAlias=finanzas
+keyPassword=CAMBIAR
