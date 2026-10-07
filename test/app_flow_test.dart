@@ -286,7 +286,7 @@ void main() {
     });
   }
 
-  testWidgets('deletes a movement after confirming', (tester) async {
+  testWidgets('deletes a movement and can undo it', (tester) async {
     final backend = await pumpApp(tester);
     await goToTab(tester, 'Historial');
 
@@ -295,13 +295,19 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Eliminar'));
     await tester.pumpAndSettle();
-    expect(find.text('¿Eliminar movimiento?'), findsOneWidget);
-    await tester.tap(find.text('Eliminar').last);
-    await tester.pumpAndSettle();
 
     expect(backend.calls, contains('deleteTransaction:t2'));
-    expect(find.text('Movimiento eliminado'), findsOneWidget);
+    expect(find.text('"Almuerzo facultad" eliminado'), findsOneWidget);
     expect(find.text('Almuerzo facultad'), findsNothing);
+
+    await tester.tap(find.text('Deshacer'));
+    await tester.pumpAndSettle();
+    final restored = backend.transactions.last;
+    expect(restored.title, 'Almuerzo facultad');
+    expect(restored.amount, 8.5);
+    expect(restored.date, DateTime(2026, 9, 22, 12));
+    await scrollTo(tester, find.text('Almuerzo facultad'));
+    expect(find.text('Almuerzo facultad'), findsOneWidget);
   });
 
   testWidgets('edits a movement', (tester) async {

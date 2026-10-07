@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show ProviderOrFamily;
 
 import '../core/network/api_client.dart';
 import '../core/utils/budget_planner.dart';
@@ -83,14 +84,21 @@ final monthlyIncomeProvider = Provider<double>((ref) {
   return averageMonthlyIncome(transactions, DateTime.now());
 });
 
-void refreshFinance(WidgetRef ref) {
-  ref.invalidate(paymentMethodsProvider);
-  ref.invalidate(recurringProvider);
-  ref.invalidate(budgetsProvider);
-  ref.invalidate(dashboardProvider);
-  ref.invalidate(categoriesProvider);
-  ref.invalidate(transactionsProvider);
-  ref.invalidate(savingsGoalsProvider);
-  ref.invalidate(categoryExpensesProvider);
-  ref.invalidate(savingsEfficiencyProvider);
+void refreshFinance(WidgetRef ref) => _refreshAll(ref.invalidate);
+
+/// [refreshFinance] for code that outlives its widget (e.g. an undo action
+/// after the sheet that started it has closed).
+void refreshFinanceIn(ProviderContainer container) =>
+    _refreshAll(container.invalidate);
+
+void _refreshAll(void Function(ProviderOrFamily provider) invalidate) {
+  invalidate(paymentMethodsProvider);
+  invalidate(recurringProvider);
+  invalidate(budgetsProvider);
+  invalidate(dashboardProvider);
+  invalidate(categoriesProvider);
+  invalidate(transactionsProvider);
+  invalidate(savingsGoalsProvider);
+  invalidate(categoryExpensesProvider);
+  invalidate(savingsEfficiencyProvider);
 }

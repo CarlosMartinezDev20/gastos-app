@@ -11,7 +11,6 @@ import '../screens/new_transaction_sheet.dart';
 import '../services/transaction_service.dart';
 import '../core/theme/app_palette.dart';
 import 'icon_mapper.dart';
-import 'ios_ui.dart';
 import '../core/theme/motion.dart';
 
 class TransactionTile extends StatelessWidget {
@@ -147,25 +146,46 @@ class _TransactionDetailState extends ConsumerState<_TransactionDetail> {
     showNewTransactionSheet(parent, transaction: _tx);
   }
 
+  /// Deletes at once and offers to undo, instead of asking first: faster,
+  /// and a mistaken tap costs nothing.
   Future<void> _delete() async {
-    final confirmed = await confirmAction(
-      context,
-      title: '¿Eliminar movimiento?',
-      message:
-          '"${_tx.title}" (${_signedAmount(_tx)}) se quitará de tu historial y de tu balance.',
-      confirmLabel: 'Eliminar',
-    );
-    if (!confirmed || !mounted) return;
-
     setState(() => _deleting = true);
     final messenger = ScaffoldMessenger.of(context);
+    // The sheet closes before an undo: keep what it needs.
+    final service = ref.read(transactionServiceProvider);
+    final container = ProviderScope.containerOf(context);
+    final tx = _tx;
     try {
-      await ref.read(transactionServiceProvider).delete(_tx.id);
+      await service.delete(tx.id);
       refreshFinance(ref);
       if (!mounted) return;
       Navigator.pop(context);
       messenger.showSnackBar(
-        const SnackBar(content: Text('Movimiento eliminado')),
+        SnackBar(
+          content: Text('"${tx.title}" eliminado'),
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'Deshacer',
+            onPressed: () async {
+              try {
+                await service.create(
+                  title: tx.title,
+                  amount: tx.amount,
+                  type: tx.type,
+                  categoryId: tx.category.id,
+                  date: tx.date,
+                  paymentMethodId: tx.paymentMethodId,
+                  reference: tx.reference,
+                );
+                refreshFinanceIn(container);
+              } catch (error) {
+                messenger.showSnackBar(
+                  SnackBar(content: Text(error.toString())),
+                );
+              }
+            },
+          ),
+        ),
       );
     } catch (error) {
       if (!mounted) return;
