@@ -1,3 +1,4 @@
+import 'package:appgastos/core/network/token_store.dart';
 import 'package:appgastos/core/theme/app_theme.dart';
 import 'package:appgastos/main.dart';
 import 'package:appgastos/models/transaction.dart';
@@ -41,7 +42,6 @@ Future<FakeBackend> pumpApp(
   final backend = FakeBackend(withData: withData);
   if (loggedIn) backend.token = 'token';
   SharedPreferences.setMockInitialValues({
-    if (loggedIn) 'flutter.access_token': 'token',
   });
   final prefs = await SharedPreferences.getInstance();
 
@@ -49,6 +49,10 @@ Future<FakeBackend> pumpApp(
     ProviderScope(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
+        // No Keystore in tests: the session lives in memory.
+        tokenStoreProvider.overrideWithValue(
+          MemoryTokenStore(loggedIn ? 'token' : null),
+        ),
         authRepositoryProvider.overrideWithValue(FakeAuthRepository(backend)),
         financeRepositoryProvider.overrideWithValue(
           FakeFinanceRepository(backend),

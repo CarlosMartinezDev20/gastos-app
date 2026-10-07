@@ -1,17 +1,15 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../providers/storage_provider.dart';
 import '../errors/api_exception.dart';
+import 'token_store.dart';
 
 final apiClientProvider = Provider<ApiClient>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return ApiClient(prefs);
+  return ApiClient(ref.watch(tokenStoreProvider));
 });
 
 class ApiClient {
-  ApiClient(this._prefs)
+  ApiClient(this._store)
     : dio = Dio(
         BaseOptions(
           baseUrl: const String.fromEnvironment(
@@ -26,7 +24,7 @@ class ApiClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
-          final token = _prefs.getString(_tokenKey);
+          final token = _token;
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
           }
@@ -47,18 +45,29 @@ class ApiClient {
     );
   }
 
-  static const _tokenKey = 'access_token';
-  final SharedPreferences _prefs;
+  final TokenStore _store;
   final Dio dio;
+
+  /// In memory after [restoreToken], so requests don't wait on storage.
+  String? _token;
 
   /// Called when an authenticated request gets a 401. Set by AuthController.
   void Function()? onUnauthorized;
 
-  String? get token => _prefs.getString(_tokenKey);
+  String? get token => _token;
 
-  Future<void> saveToken(String token) => _prefs.setString(_tokenKey, token);
+  /// Loads the saved session, once, before the first request.
+  Future<void> restoreToken() async => _token ??= await _store.read();
 
-  Future<void> clearToken() => _prefs.remove(_tokenKey);
+  Future<void> saveToken(String token) {
+    _token = token;
+    return _store.write(token);
+  }
+
+  Future<void> clearToken() {
+    _token = null;
+    return _store.delete();
+  }
 
   ApiException parseError(Object error) {
     if (error is DioException) {

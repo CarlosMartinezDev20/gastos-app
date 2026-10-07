@@ -34,6 +34,7 @@ class AuthController extends Notifier<AsyncValue<UserProfile?>> {
 
   Future<void> load() async {
     final api = ref.read(apiClientProvider);
+    await api.restoreToken();
     if (api.token == null) {
       state = const AsyncData(null);
       return;
