@@ -770,7 +770,9 @@ class _AuthFormState extends ConsumerState<AuthForm> {
                 decoration: const InputDecoration(
                   labelText: 'Nombre',
                   prefixIcon: Icon(CupertinoIcons.person),
+                  counterText: '',
                 ),
+                maxLength: 60,
                 validator: (v) =>
                     v == null || v.trim().isEmpty ? 'Escribe tu nombre' : null,
               ),
@@ -819,7 +821,12 @@ class _AuthFormState extends ConsumerState<AuthForm> {
                 ),
               ),
               validator: (v) =>
-                  v == null || v.length < 6 ? 'Mínimo 6 caracteres' : null,
+                  // New accounts need 8; older ones may still sign in.
+                  v == null || v.isEmpty
+                  ? 'Escribe tu contraseña'
+                  : _register && v.length < 8
+                  ? 'Mínimo 8 caracteres'
+                  : null,
             ),
             AnimatedSize(
               duration: Motion.of(context, Motion.medium),

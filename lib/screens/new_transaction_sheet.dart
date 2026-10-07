@@ -357,8 +357,10 @@ class _NewTransactionSheetState extends ConsumerState<NewTransactionSheet> {
                 const Gap(14),
                 TextFormField(
                   controller: _title,
+                  maxLength: 120,
                   textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
+                    counterText: '',
                     labelText: 'Descripción',
                     hintText: 'Ej. Almuerzo en la facultad',
                     prefixIcon: Icon(Icons.notes_outlined),

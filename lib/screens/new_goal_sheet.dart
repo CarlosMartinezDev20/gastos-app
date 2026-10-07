@@ -142,10 +142,12 @@ class _NewGoalSheetState extends ConsumerState<NewGoalSheet> {
                 EntranceAutofocus(
                   enabled: !_editing,
                   builder: (context, focusNode) => TextFormField(
+                    maxLength: 60,
                     controller: _name,
                     focusNode: focusNode,
                     textCapitalization: TextCapitalization.sentences,
                     decoration: const InputDecoration(
+                      counterText: '',
                       labelText: 'Nombre de la meta',
                       hintText: 'Ej. Viaje de fin de ciclo',
                     ),

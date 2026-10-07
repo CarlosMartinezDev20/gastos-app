@@ -156,11 +156,13 @@ class _NewGoalFullScreenState extends ConsumerState<NewGoalFullScreen> {
                   const Gap(18),
                   EntranceAutofocus(
                     builder: (context, focusNode) => TextFormField(
+                      maxLength: 60,
                       controller: _name,
                       focusNode: focusNode,
                       textCapitalization: TextCapitalization.sentences,
                       textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(
+                        counterText: '',
                         labelText: 'Nombre de la meta',
                         hintText: 'Ej. Nueva laptop',
                       ),
