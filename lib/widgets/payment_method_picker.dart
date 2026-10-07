@@ -12,11 +12,15 @@ class PaymentMethodPicker extends StatelessWidget {
     required this.methods,
     required this.selected,
     required this.onChanged,
+    this.allowAdd = true,
   });
 
   final List<PaymentMethod> methods;
   final String? selected;
   final ValueChanged<String?> onChanged;
+
+  /// Show the chip that adds a method without leaving the form.
+  final bool allowAdd;
 
   @override
   Widget build(BuildContext context) {
@@ -40,17 +44,18 @@ class PaymentMethodPicker extends StatelessWidget {
             selected: selected == method.id,
             onSelected: (on) => onChanged(on ? method.id : null),
           ),
-        ActionChip(
-          avatar: const Icon(Icons.add, size: 18),
-          label: Text(
-            methods.isEmpty ? 'Agregar tarjeta o efectivo' : 'Agregar',
+        if (allowAdd)
+          ActionChip(
+            avatar: const Icon(Icons.add, size: 18),
+            label: Text(
+              methods.isEmpty ? 'Agregar tarjeta o efectivo' : 'Agregar',
+            ),
+            tooltip: 'Agregar método de pago',
+            onPressed: () async {
+              final created = await showPaymentMethodSheet(context);
+              if (created != null) onChanged(created.id);
+            },
           ),
-          tooltip: 'Agregar método de pago',
-          onPressed: () async {
-            final created = await showPaymentMethodSheet(context);
-            if (created != null) onChanged(created.id);
-          },
-        ),
       ],
     );
   }

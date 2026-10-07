@@ -319,6 +319,47 @@ class FinanceRepository {
     }
   }
 
+  Future<List<CardPayment>> cardPayments(String methodId) async {
+    try {
+      final response = await _api.dio.get(ApiEndpoints.cardPayments(methodId));
+      return (response.data as List)
+          .map((e) => CardPayment.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  /// A payment to a credit card: lowers what's owed, not the balance.
+  Future<CardPayment> addCardPayment(
+    String methodId, {
+    required double amount,
+    required DateTime date,
+    String? fromMethodId,
+  }) async {
+    try {
+      final response = await _api.dio.post(
+        ApiEndpoints.cardPayments(methodId),
+        data: {
+          'amount': amount,
+          'date': date.toUtc().toIso8601String(),
+          'fromMethodId': ?fromMethodId,
+        },
+      );
+      return CardPayment.fromJson(response.data as Map<String, dynamic>);
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  Future<void> deleteCardPayment(String id) async {
+    try {
+      await _api.dio.delete(ApiEndpoints.cardPayment(id));
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
   /// Its movements stay, without a payment method.
   Future<void> deletePaymentMethod(String id) async {
     try {

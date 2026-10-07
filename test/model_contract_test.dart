@@ -147,11 +147,26 @@ void main() {
       'createdAt': '2026-10-07T00:19:21.552Z',
       'updatedAt': '2026-10-07T00:19:21.552Z',
       'transactionCount': 3,
+      'paidTotal': 120.5,
     });
     expect(card.kind, PaymentMethodKind.creditCard);
     expect(card.brand, CardBrand.visa);
     expect(card.creditLimit, 500.0);
     expect(card.transactionCount, 3);
+    expect(card.paidTotal, 120.5);
+
+    // POST /payment-methods/:id/payments (as the API returned it).
+    final payment = CardPayment.fromJson({
+      'id': 'cp-1',
+      'userId': 'u1',
+      'paymentMethodId': 'pm-1',
+      'fromMethodId': 'pm-2',
+      'amount': 120.5,
+      'date': '2026-10-07T21:50:00.000Z',
+      'createdAt': '2026-10-07T21:50:00.000Z',
+    });
+    expect(payment.amount, 120.5);
+    expect(payment.fromMethodId, 'pm-2');
     expect(card.masked, '•••• 4821');
 
     final cash = PaymentMethod.fromJson({

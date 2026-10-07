@@ -18,6 +18,9 @@ class ApiEndpoints {
   static String budget(String categoryId) => '/budgets/$categoryId';
   static String recurringRule(String id) => '/recurring/$id';
   static String paymentMethod(String id) => '/payment-methods/$id';
+  static String cardPayments(String methodId) =>
+      '/payment-methods/$methodId/payments';
+  static String cardPayment(String id) => '/payment-methods/payments/$id';
   static String transaction(String id) => '/transactions/$id';
   static String savingsGoal(String id) => '/savings-goals/$id';
   static String addGoalFunds(String id) => '/savings-goals/$id/add-funds';

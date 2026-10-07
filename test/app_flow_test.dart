@@ -872,6 +872,68 @@ void main() {
     expect(find.text('Nada se repite todavía'), findsOneWidget);
   });
 
+  testWidgets('paying a credit card lowers the debt, not the balance', (
+    tester,
+  ) async {
+    final backend = await pumpApp(tester);
+    backend.paymentMethods.add(
+      const PaymentMethod(
+        id: 'visa',
+        name: 'Visa',
+        kind: PaymentMethodKind.creditCard,
+        color: 'ink',
+        last4: '4821',
+        creditLimit: 500,
+      ),
+    );
+    backend.transactions.add(
+      Transaction(
+        id: 'buy',
+        title: 'Zapatos',
+        amount: 200,
+        type: TransactionType.expense,
+        date: DateTime.now(),
+        category: food,
+        paymentMethodId: 'visa',
+      ),
+    );
+    final balance = backend.balance;
+
+    await openProfile(tester);
+    await scrollTo(tester, find.text('Mi wallet'));
+    await tester.tap(find.text('Mi wallet'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining(r'Debes $200.00'), findsOneWidget);
+
+    await tester.tap(find.text('•••• 4821'));
+    await tester.pumpAndSettle();
+    await scrollTo(tester, find.text('Registrar pago'));
+    await tester.tap(find.text('Registrar pago'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('No cuenta como gasto'), findsOneWidget);
+    expect(find.text(r'Deuda total · $200.00'), findsOneWidget);
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Monto pagado'),
+      '150',
+    );
+    await scrollTo(tester, find.text('Registrar pago').last);
+    await tester.tap(find.text('Registrar pago').last);
+    await tester.pumpAndSettle();
+
+    expect(backend.cardPayments.single.amount, 150);
+    expect(backend.balance, balance, reason: 'not an expense');
+    expect(find.text(r'Debes $50.00'), findsOneWidget);
+
+    // A payment entered by mistake can be deleted: the debt comes back.
+    await scrollTo(tester, find.byTooltip('Borrar pago'));
+    await tester.tap(find.byTooltip('Borrar pago'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Borrar'));
+    await tester.pumpAndSettle();
+    expect(backend.cardPayments, isEmpty);
+    expect(find.text(r'Debes $200.00'), findsWidgets);
+  });
+
   testWidgets('a recurring rule pays with a wallet method', (tester) async {
     final backend = await pumpApp(tester);
     backend.paymentMethods.add(

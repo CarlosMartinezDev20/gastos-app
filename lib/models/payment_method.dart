@@ -51,6 +51,7 @@ class PaymentMethod {
     this.statementDay,
     this.dueDay,
     this.transactionCount = 0,
+    this.paidTotal = 0,
   });
 
   final String id;
@@ -71,6 +72,9 @@ class PaymentMethod {
   /// Movements paid with it.
   final int transactionCount;
 
+  /// Credit cards: everything paid to the card so far.
+  final double paidTotal;
+
   /// "•••• 4821", or null without digits.
   String? get masked => last4 == null ? null : '•••• $last4';
 
@@ -89,6 +93,7 @@ class PaymentMethod {
     statementDay: json['statementDay'] as int?,
     dueDay: json['dueDay'] as int?,
     transactionCount: json['transactionCount'] as int? ?? 0,
+    paidTotal: (json['paidTotal'] as num?)?.toDouble() ?? 0,
   );
 }
 
@@ -128,4 +133,32 @@ class PaymentMethodInput {
     'statementDay': kind.isCredit ? statementDay : null,
     'dueDay': kind.isCredit ? dueDay : null,
   };
+}
+
+/// A payment to a credit card. Not an expense (the purchases were): it
+/// lowers what is owed on the card, not the balance.
+class CardPayment {
+  const CardPayment({
+    required this.id,
+    required this.paymentMethodId,
+    required this.amount,
+    required this.date,
+    this.fromMethodId,
+  });
+
+  final String id;
+  final String paymentMethodId;
+  final double amount;
+  final DateTime date;
+
+  /// Where the money came from (debit, cash…), if known.
+  final String? fromMethodId;
+
+  factory CardPayment.fromJson(Map<String, dynamic> json) => CardPayment(
+    id: json['id'] as String,
+    paymentMethodId: json['paymentMethodId'] as String,
+    amount: (json['amount'] as num).toDouble(),
+    date: DateTime.parse(json['date'] as String),
+    fromMethodId: json['fromMethodId'] as String?,
+  );
 }

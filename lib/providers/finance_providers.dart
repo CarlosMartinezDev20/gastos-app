@@ -68,6 +68,15 @@ final paymentMethodsProvider = FutureProvider<List<PaymentMethod>>((ref) {
   return ref.watch(financeRepositoryProvider).paymentMethods();
 });
 
+/// Payments made to one credit card, newest first.
+final cardPaymentsProvider = FutureProvider.family<List<CardPayment>, String>((
+  ref,
+  methodId,
+) {
+  ref.watch(currentUserIdProvider);
+  return ref.watch(financeRepositoryProvider).cardPayments(methodId);
+});
+
 final recurringProvider = FutureProvider<List<RecurringRule>>((ref) {
   ref.watch(currentUserIdProvider);
   return ref.watch(financeRepositoryProvider).recurring();
@@ -93,6 +102,7 @@ void refreshFinanceIn(ProviderContainer container) =>
 
 void _refreshAll(void Function(ProviderOrFamily provider) invalidate) {
   invalidate(paymentMethodsProvider);
+  invalidate(cardPaymentsProvider);
   invalidate(recurringProvider);
   invalidate(budgetsProvider);
   invalidate(dashboardProvider);

@@ -58,6 +58,9 @@ class FakeBackend {
   /// The wallet.
   final paymentMethods = <PaymentMethod>[];
 
+  /// Payments to credit cards.
+  final cardPayments = <CardPayment>[];
+
   Category category(String id) => allCategories.firstWhere((c) => c.id == id);
 
   FakeBackend({bool withData = true}) {
@@ -488,8 +491,47 @@ class FakeFinanceRepository implements FinanceRepository {
         transactionCount: backend.transactions
             .where((t) => t.paymentMethodId == m.id)
             .length,
+        paidTotal: backend.cardPayments
+            .where((p) => p.paymentMethodId == m.id)
+            .fold(0.0, (sum, p) => sum + p.amount),
       ),
   ];
+
+  @override
+  Future<List<CardPayment>> cardPayments(String methodId) async =>
+      backend.cardPayments.where((p) => p.paymentMethodId == methodId).toList()
+        ..sort((a, b) => b.date.compareTo(a.date));
+
+  @override
+  Future<CardPayment> addCardPayment(
+    String methodId, {
+    required double amount,
+    required DateTime date,
+    String? fromMethodId,
+  }) async {
+    final card = backend.paymentMethods.firstWhere((m) => m.id == methodId);
+    if (!card.kind.isCredit) {
+      throw const ApiException(
+        'Solo las tarjetas de crédito reciben pagos',
+        statusCode: 400,
+      );
+    }
+    final payment = CardPayment(
+      id: 'cp${backend.cardPayments.length + 1}',
+      paymentMethodId: methodId,
+      amount: amount,
+      date: date,
+      fromMethodId: fromMethodId,
+    );
+    backend.cardPayments.add(payment);
+    return payment;
+  }
+
+  @override
+  Future<void> deleteCardPayment(String id) async {
+    backend.calls.add('deleteCardPayment:$id');
+    backend.cardPayments.removeWhere((p) => p.id == id);
+  }
 
   PaymentMethod _method(String id, PaymentMethodInput input) {
     final json = input.toJson();

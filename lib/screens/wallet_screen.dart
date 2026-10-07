@@ -16,6 +16,7 @@ import '../widgets/ios_ui.dart';
 import '../widgets/mascot.dart';
 import '../widgets/transaction_tile.dart';
 import '../widgets/wallet_card.dart';
+import 'card_payment_sheet.dart';
 import 'payment_method_sheet.dart';
 
 /// "Mi wallet": the user's cards and other payment methods, each with what
@@ -134,7 +135,7 @@ class _WalletEntry extends StatelessWidget {
           onTap: () => showWalletDetail(context, summary.method.id),
           child: WalletCard(method: summary.method, summary: summary),
         ),
-        if (limit != null || due != null) ...[
+        if (summary.debt != null || limit != null || due != null) ...[
           const SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -153,6 +154,7 @@ class _WalletEntry extends StatelessWidget {
                 ],
                 Text(
                   [
+                    if (summary.debt case final debt?) _debtLabel(debt),
                     if (summary.available case final available?)
                       available < 0
                           ? 'Pasaste el límite por '
@@ -171,6 +173,12 @@ class _WalletEntry extends StatelessWidget {
     );
   }
 }
+
+String _debtLabel(double debt) => debt > 0
+    ? 'Debes ${Formatters.compactMoney(debt)}'
+    : debt < 0
+    ? '${Formatters.compactMoney(-debt)} a favor'
+    : 'Al día';
 
 String _dueLabel(DateTime due) {
   final days = daysUntil(due, DateTime.now());
@@ -218,6 +226,14 @@ class _WalletDetail extends ConsumerWidget {
         summary.byStatement ? 'Gastado en este corte' : 'Gastado este mes',
         Formatters.compactMoney(summary.spent),
       ),
+      if (summary.debt case final debt?)
+        (CupertinoIcons.money_dollar_circle, 'Deuda actual', _debtLabel(debt)),
+      if (summary.lastStatementSpent case final last? when last > 0)
+        (
+          CupertinoIcons.doc_text,
+          'Último corte',
+          Formatters.compactMoney(last),
+        ),
       if (summary.limit case final limit?)
         (CupertinoIcons.gauge, 'Límite', Formatters.compactMoney(limit)),
       if (summary.closesOn case final close?)
@@ -287,6 +303,16 @@ class _WalletDetail extends ConsumerWidget {
               ),
             ),
           const SizedBox(height: 18),
+          if (method.kind.isCredit) ...[
+            _CardPayments(methodId: method.id),
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              onPressed: () => showCardPaymentSheet(context, summary: summary),
+              icon: const Icon(CupertinoIcons.checkmark_seal),
+              label: const Text('Registrar pago'),
+            ),
+            const SizedBox(height: 8),
+          ],
           OutlinedButton.icon(
             onPressed: () => showPaymentMethodSheet(context, method: method),
             icon: const Icon(CupertinoIcons.pencil, size: 18),
@@ -405,4 +431,69 @@ class _PressableState extends State<_Pressable> {
       ),
     ),
   );
+}
+
+/// Payments made to a credit card; a wrong one can be deleted.
+class _CardPayments extends ConsumerWidget {
+  const _CardPayments({required this.methodId});
+
+  final String methodId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final payments = ref.watch(cardPaymentsProvider(methodId)).value;
+    if (payments == null || payments.isEmpty) return const SizedBox.shrink();
+    final methods = ref.watch(paymentMethodsProvider).value ?? const [];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 18),
+        Text('Pagos', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        InsetGroup(
+          children: [
+            for (final payment in payments.take(6))
+              InsetTile(
+                icon: CupertinoIcons.checkmark_seal_fill,
+                iconColor: context.palette.onMint,
+                title: [
+                  Formatters.dayLabel(payment.date),
+                  if (methods
+                          .where((m) => m.id == payment.fromMethodId)
+                          .firstOrNull
+                      case final from?)
+                    'desde ${from.name}',
+                ].join(' · '),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      Formatters.compactMoney(payment.amount),
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    IconButton(
+                      tooltip: 'Borrar pago',
+                      icon: const Icon(CupertinoIcons.trash, size: 18),
+                      onPressed: () async {
+                        final confirmed = await confirmAction(
+                          context,
+                          title: '¿Borrar este pago?',
+                          message: 'Vuelve a contar como deuda de la tarjeta.',
+                          confirmLabel: 'Borrar',
+                        );
+                        if (!confirmed) return;
+                        await ref
+                            .read(financeRepositoryProvider)
+                            .deleteCardPayment(payment.id);
+                        refreshFinance(ref);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
 }

@@ -101,8 +101,11 @@ void main() {
     ], now);
     expect(summary.spent, 150);
     expect(summary.movements.map((t) => t.id), ['refund', 'b', 'a']);
-    expect(summary.available, 350);
-    expect(summary.utilization, closeTo(.3, 1e-9));
+    // Owed: every purchase (99 + 120 + 30) minus the refund (10).
+    expect(summary.debt, 239);
+    expect(summary.available, 261);
+    expect(summary.utilization, closeTo(.478, 1e-9));
+    expect(summary.lastStatementSpent, 99, reason: 'Aug 16 – Sep 15');
     expect(summary.closesOn, DateTime(2026, 10, 15));
     expect(summary.periodLabel, 'Corte del 15 oct');
     expect(summary.dueDate, DateTime(2026, 11, 5));
@@ -149,5 +152,25 @@ void main() {
       lastUsedPaymentMethodId(transactions, const [], TransactionType.expense),
       isNull,
     );
+  });
+
+  test('payments lower the debt, not the spending', () {
+    const paid = PaymentMethod(
+      id: 'visa',
+      name: 'Visa',
+      kind: PaymentMethodKind.creditCard,
+      color: 'ink',
+      creditLimit: 500,
+      paidTotal: 300,
+    );
+    final summary = summarizeMethod(paid, [
+      tx('a', DateTime(2026, 10, 1), 200, method: 'visa'),
+      tx('b', DateTime(2026, 10, 2), 50, method: 'visa'),
+    ], DateTime(2026, 10, 6));
+    expect(summary.spent, 250, reason: 'no closing day: the month');
+    expect(summary.debt, -50, reason: 'paid more than owed');
+    expect(summary.available, 550);
+    expect(summary.utilization, 0);
+    expect(summary.lastStatementSpent, isNull);
   });
 }

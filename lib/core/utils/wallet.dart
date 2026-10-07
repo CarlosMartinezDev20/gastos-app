@@ -63,6 +63,8 @@ class WalletSummary {
     required this.spent,
     required this.movements,
     this.dueDate,
+    this.debt,
+    this.lastStatementSpent,
   });
 
   final PaymentMethod method;
@@ -75,16 +77,25 @@ class WalletSummary {
   final List<Transaction> movements;
   final DateTime? dueDate;
 
+  /// Credit cards: what is owed now — every purchase with it, minus refunds
+  /// to it and payments made to it. Negative is money in your favor.
+  final double? debt;
+
+  /// Credit cards with a closing day: spending in the last closed
+  /// statement (what the next payment is usually about).
+  final double? lastStatementSpent;
+
   bool get byStatement => method.kind.isCredit && method.statementDay != null;
 
   double? get limit => method.kind.isCredit ? method.creditLimit : null;
 
-  /// Limit left after this period's spending (can go negative).
-  double? get available => limit == null ? null : limit! - spent;
+  /// Limit left after what is owed (can go negative).
+  double? get available => limit == null ? null : limit! - (debt ?? spent);
 
-  /// Share of the limit used this period (can pass 1).
-  double? get utilization =>
-      limit == null || limit! <= 0 ? null : spent / limit!;
+  /// Share of the limit in use (can pass 1).
+  double? get utilization => limit == null || limit! <= 0
+      ? null
+      : ((debt ?? spent) / limit!).clamp(0, double.infinity).toDouble();
 
   /// The statement's closing date (its last day).
   DateTime? get closesOn =>
@@ -112,18 +123,56 @@ WalletSummary summarizeMethod(
     final date = t.date.toLocal();
     return !date.isBefore(period.start) && date.isBefore(period.end);
   }).toList()..sort((a, b) => b.date.compareTo(a.date));
-  final spent = movements
-      .where((t) => t.type == TransactionType.expense)
-      .fold(0.0, (sum, t) => sum + t.amount);
+  final spent = _expensesIn(transactions, method.id, period);
+  final credit = method.kind.isCredit;
+  double? debt;
+  if (credit) {
+    var owed = -method.paidTotal;
+    for (final t in transactions) {
+      if (t.paymentMethodId != method.id) continue;
+      owed += t.type == TransactionType.expense ? t.amount : -t.amount;
+    }
+    // Cents from summing doubles shouldn't show as a debt.
+    debt = (owed * 100).roundToDouble() / 100;
+  }
   return WalletSummary(
     method: method,
     period: period,
     spent: spent,
     movements: movements,
-    dueDate: method.kind.isCredit && method.dueDay != null
+    dueDate: credit && method.dueDay != null
         ? nextDueDate(method.dueDay!, now)
         : null,
+    debt: debt,
+    lastStatementSpent: credit && method.statementDay != null
+        ? _expensesIn(
+            transactions,
+            method.id,
+            statementPeriod(
+              method.statementDay!,
+              period.start.subtract(const Duration(days: 1)),
+            ),
+          )
+        : null,
   );
+}
+
+double _expensesIn(
+  List<Transaction> transactions,
+  String methodId,
+  Period period,
+) {
+  var total = 0.0;
+  for (final t in transactions) {
+    if (t.paymentMethodId != methodId || t.type != TransactionType.expense) {
+      continue;
+    }
+    final date = t.date.toLocal();
+    if (!date.isBefore(period.start) && date.isBefore(period.end)) {
+      total += t.amount;
+    }
+  }
+  return total;
 }
 
 /// The method used in the newest movement of [type] that has one, if it is
