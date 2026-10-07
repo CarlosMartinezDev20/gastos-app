@@ -11,8 +11,14 @@ import 'motion.dart';
 class AppTheme {
   const AppTheme._();
 
-  /// System typography avoids downloading fonts during startup.
+  /// Downloads Inter at runtime (google_fonts) instead of using the bundled
+  /// copy; off by default and in tests.
   static bool useGoogleFonts = false;
+
+  /// Bundled fonts (assets/fonts/inter): Inter for text and Inter Display,
+  /// its cut for large sizes, for titles — like SF Pro Text / Display.
+  static String? get bodyFont => useGoogleFonts ? null : 'Inter';
+  static String? get titleFont => useGoogleFonts ? null : 'InterDisplay';
 
   static ThemeData light() {
     final scheme =
@@ -55,22 +61,37 @@ class AppTheme {
   ) {
     final baseText = useGoogleFonts
         ? GoogleFonts.interTextTheme()
-        : ThemeData(brightness: scheme.brightness).textTheme;
+        : ThemeData(
+            brightness: scheme.brightness,
+          ).textTheme.apply(fontFamily: bodyFont);
+    // Material's tracking is tuned for Roboto (up to +0.5); Inter, like SF
+    // Pro, reads best neutral to slightly tight as text grows.
+    TextStyle? tracked(TextStyle? style, double spacing) =>
+        style?.copyWith(letterSpacing: spacing);
     final textTheme = baseText
         .apply(bodyColor: scheme.onSurface, displayColor: scheme.onSurface)
         .copyWith(
+          bodyLarge: tracked(baseText.bodyLarge, -0.2),
+          bodyMedium: tracked(baseText.bodyMedium, -0.1),
+          bodySmall: tracked(baseText.bodySmall, 0),
+          labelLarge: tracked(baseText.labelLarge, -0.1),
+          labelMedium: tracked(baseText.labelMedium, 0),
+          labelSmall: tracked(baseText.labelSmall, 0),
           // Large, tight headings like iOS large titles.
           displaySmall: baseText.displaySmall?.copyWith(
+            fontFamily: titleFont,
             fontWeight: FontWeight.w700,
             letterSpacing: -1.2,
             color: scheme.onSurface,
           ),
           headlineMedium: baseText.headlineMedium?.copyWith(
+            fontFamily: titleFont,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.9,
             color: scheme.onSurface,
           ),
           headlineSmall: baseText.headlineSmall?.copyWith(
+            fontFamily: titleFont,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.6,
             color: scheme.onSurface,
@@ -93,6 +114,7 @@ class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
+      fontFamily: bodyFont,
       colorScheme: scheme,
       textTheme: textTheme,
       scaffoldBackgroundColor: background,

@@ -76,6 +76,35 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # Inter (SIL OFL 1.1, assets/fonts/inter/OFL.txt): bundled so the app looks
+  # the same on every phone without downloading fonts. Inter Display is its
+  # cut for large sizes, used by titles.
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/inter/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/inter/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/inter/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/inter/Inter-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/inter/Inter-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/inter/Inter-Black.ttf
+          weight: 900
+    - family: InterDisplay
+      fonts:
+        - asset: assets/fonts/inter/InterDisplay-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/inter/InterDisplay-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/inter/InterDisplay-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/inter/InterDisplay-Black.ttf
+          weight: 900
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg
