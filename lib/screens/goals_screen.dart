@@ -27,65 +27,68 @@ class GoalsScreen extends ConsumerWidget {
         message: error.toString(),
         onRetry: () => ref.invalidate(savingsGoalsProvider),
       ),
-      data: (items) => RefreshIndicator(
-        onRefresh: () => ref.refresh(savingsGoalsProvider.future),
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(20, 20, 20, dockClearance(context)),
-          children: [
-            LargeTitle(
-              title: 'Metas',
-              subtitle: 'Ahorra para lo que de verdad quieres',
-              trailing: [
-                CircleButton(
-                  icon: CupertinoIcons.add,
-                  tooltip: 'Nueva meta',
-                  filled: true,
-                  onPressed: () => showNewGoalSheet(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            if (items.isEmpty)
-              BentoCard(
-                color: context.palette.lilac,
-                onTap: () => showNewGoalSheet(context),
-                padding: const EdgeInsets.all(22),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      CupertinoIcons.flag_fill,
-                      color: context.palette.onLilac,
-                      size: 28,
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'Aún no tienes metas',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+      data: (items) => CollapsingTitle(
+        title: 'Metas',
+        child: RefreshIndicator(
+          onRefresh: () => ref.refresh(savingsGoalsProvider.future),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(20, 20, 20, dockClearance(context)),
+            children: [
+              LargeTitle(
+                title: 'Metas',
+                subtitle: 'Ahorra para lo que de verdad quieres',
+                trailing: [
+                  CircleButton(
+                    icon: CupertinoIcons.add,
+                    tooltip: 'Nueva meta',
+                    filled: true,
+                    onPressed: () => showNewGoalSheet(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              if (items.isEmpty)
+                BentoCard(
+                  color: context.palette.lilac,
+                  onTap: () => showNewGoalSheet(context),
+                  padding: const EdgeInsets.all(22),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        CupertinoIcons.flag_fill,
                         color: context.palette.onLilac,
+                        size: 28,
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Crea una meta y aporta desde tu balance cuando puedas.',
-                      style: TextStyle(color: context.palette.onLilac),
-                    ),
-                  ],
-                ),
-              )
-            else ...[
-              _GoalsSummary(goals: items),
-              const SizedBox(height: 24),
-              const SectionHeader(title: 'Tus metas'),
-              const SizedBox(height: 8),
-              for (final entry in items.indexed)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _GoalCard(goal: entry.$2, index: entry.$1),
-                ),
+                      const SizedBox(height: 14),
+                      Text(
+                        'Aún no tienes metas',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: context.palette.onLilac,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Crea una meta y aporta desde tu balance cuando puedas.',
+                        style: TextStyle(color: context.palette.onLilac),
+                      ),
+                    ],
+                  ),
+                )
+              else ...[
+                _GoalsSummary(goals: items),
+                const SizedBox(height: 24),
+                const SectionHeader(title: 'Tus metas'),
+                const SizedBox(height: 8),
+                for (final entry in items.indexed)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _GoalCard(goal: entry.$2, index: entry.$1),
+                  ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

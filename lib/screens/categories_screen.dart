@@ -34,67 +34,72 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
-            child: RefreshIndicator(
-              onRefresh: () => ref.refresh(categoriesProvider.future),
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(
-                  20,
-                  12,
-                  20,
-                  MediaQuery.paddingOf(context).bottom + 28,
+            child: CollapsingTitle(
+              title: 'Categorías',
+              onBack: () =>
+                  context.canPop() ? context.pop() : context.go('/profile'),
+              child: RefreshIndicator(
+                onRefresh: () => ref.refresh(categoriesProvider.future),
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    12,
+                    20,
+                    MediaQuery.paddingOf(context).bottom + 28,
+                  ),
+                  children: [
+                    Row(
+                      children: [
+                        CircleButton(
+                          icon: CupertinoIcons.chevron_left,
+                          tooltip: 'Volver',
+                          onPressed: () => context.canPop()
+                              ? context.pop()
+                              : context.go('/profile'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    LargeTitle(
+                      title: 'Categorías',
+                      subtitle: 'Ordena tus gastos e ingresos a tu manera',
+                      trailing: [
+                        CircleButton(
+                          icon: CupertinoIcons.add,
+                          tooltip: 'Nueva categoría',
+                          filled: true,
+                          onPressed: () =>
+                              showCategorySheet(context, type: _type),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    SegmentedTabs<TransactionType>(
+                      selected: _type,
+                      onChanged: (value) => setState(() => _type = value),
+                      segments: const {
+                        TransactionType.expense: 'Gastos',
+                        TransactionType.income: 'Ingresos',
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    categories.when(
+                      loading: () =>
+                          const SizedBox(height: 320, child: AppShimmer()),
+                      error: (error, _) => AppErrorState(
+                        message: error.toString(),
+                        onRetry: () => ref.invalidate(categoriesProvider),
+                      ),
+                      data: (items) => _CategoryLists(
+                        // Rebuild the entrance animation per segment.
+                        key: ValueKey(_type),
+                        type: _type,
+                        items: items.where((c) => c.type == _type).toList(),
+                      ),
+                    ),
+                  ],
                 ),
-                children: [
-                  Row(
-                    children: [
-                      CircleButton(
-                        icon: CupertinoIcons.chevron_left,
-                        tooltip: 'Volver',
-                        onPressed: () => context.canPop()
-                            ? context.pop()
-                            : context.go('/profile'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  LargeTitle(
-                    title: 'Categorías',
-                    subtitle: 'Ordena tus gastos e ingresos a tu manera',
-                    trailing: [
-                      CircleButton(
-                        icon: CupertinoIcons.add,
-                        tooltip: 'Nueva categoría',
-                        filled: true,
-                        onPressed: () =>
-                            showCategorySheet(context, type: _type),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  SegmentedTabs<TransactionType>(
-                    selected: _type,
-                    onChanged: (value) => setState(() => _type = value),
-                    segments: const {
-                      TransactionType.expense: 'Gastos',
-                      TransactionType.income: 'Ingresos',
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  categories.when(
-                    loading: () =>
-                        const SizedBox(height: 320, child: AppShimmer()),
-                    error: (error, _) => AppErrorState(
-                      message: error.toString(),
-                      onRetry: () => ref.invalidate(categoriesProvider),
-                    ),
-                    data: (items) => _CategoryLists(
-                      // Rebuild the entrance animation per segment.
-                      key: ValueKey(_type),
-                      type: _type,
-                      items: items.where((c) => c.type == _type).toList(),
-                    ),
-                  ),
-                ],
               ),
             ),
           ),

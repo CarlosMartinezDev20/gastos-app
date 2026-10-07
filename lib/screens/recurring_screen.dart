@@ -34,58 +34,63 @@ class RecurringScreen extends ConsumerWidget {
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
-            child: RefreshIndicator(
-              onRefresh: () => ref.refresh(recurringProvider.future),
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(
-                  20,
-                  12,
-                  20,
-                  MediaQuery.paddingOf(context).bottom + 28,
-                ),
-                children: [
-                  Row(
-                    children: [
-                      CircleButton(
-                        icon: CupertinoIcons.chevron_left,
-                        tooltip: 'Volver',
-                        onPressed: () => context.canPop()
-                            ? context.pop()
-                            : context.go('/profile'),
-                      ),
-                    ],
+            child: CollapsingTitle(
+              title: 'Recurrentes',
+              onBack: () =>
+                  context.canPop() ? context.pop() : context.go('/profile'),
+              child: RefreshIndicator(
+                onRefresh: () => ref.refresh(recurringProvider.future),
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    12,
+                    20,
+                    MediaQuery.paddingOf(context).bottom + 28,
                   ),
-                  const SizedBox(height: 16),
-                  LargeTitle(
-                    title: 'Recurrentes',
-                    subtitle: 'Mesada, alquiler, suscripciones…',
-                    trailing: [
-                      CircleButton(
-                        icon: CupertinoIcons.add,
-                        tooltip: 'Nuevo recurrente',
-                        filled: true,
-                        onPressed: () => showNewTransactionSheet(
-                          context,
-                          initialType: TransactionType.expense,
-                          repeat: RecurrenceFrequency.monthly,
+                  children: [
+                    Row(
+                      children: [
+                        CircleButton(
+                          icon: CupertinoIcons.chevron_left,
+                          tooltip: 'Volver',
+                          onPressed: () => context.canPop()
+                              ? context.pop()
+                              : context.go('/profile'),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  rules.when(
-                    loading: () =>
-                        const SizedBox(height: 240, child: AppShimmer()),
-                    error: (error, _) => AppErrorState(
-                      message: error.toString(),
-                      onRetry: () => ref.invalidate(recurringProvider),
+                      ],
                     ),
-                    data: (items) => items.isEmpty
-                        ? const _EmptyRecurring()
-                        : _RecurringList(items: items),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    LargeTitle(
+                      title: 'Recurrentes',
+                      subtitle: 'Mesada, alquiler, suscripciones…',
+                      trailing: [
+                        CircleButton(
+                          icon: CupertinoIcons.add,
+                          tooltip: 'Nuevo recurrente',
+                          filled: true,
+                          onPressed: () => showNewTransactionSheet(
+                            context,
+                            initialType: TransactionType.expense,
+                            repeat: RecurrenceFrequency.monthly,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    rules.when(
+                      loading: () =>
+                          const SizedBox(height: 240, child: AppShimmer()),
+                      error: (error, _) => AppErrorState(
+                        message: error.toString(),
+                        onRetry: () => ref.invalidate(recurringProvider),
+                      ),
+                      data: (items) => items.isEmpty
+                          ? const _EmptyRecurring()
+                          : _RecurringList(items: items),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

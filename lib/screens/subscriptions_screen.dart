@@ -38,78 +38,85 @@ class SubscriptionsScreen extends ConsumerWidget {
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
-            child: RefreshIndicator(
-              onRefresh: () => ref.refresh(recurringProvider.future),
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(
-                  20,
-                  12,
-                  20,
-                  MediaQuery.paddingOf(context).bottom + 28,
+            child: CollapsingTitle(
+              title: 'Suscripciones',
+              onBack: () =>
+                  context.canPop() ? context.pop() : context.go('/profile'),
+              child: RefreshIndicator(
+                onRefresh: () => ref.refresh(recurringProvider.future),
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    12,
+                    20,
+                    MediaQuery.paddingOf(context).bottom + 28,
+                  ),
+                  children: [
+                    Row(
+                      children: [
+                        CircleButton(
+                          icon: CupertinoIcons.chevron_left,
+                          tooltip: 'Volver',
+                          onPressed: () => context.canPop()
+                              ? context.pop()
+                              : context.go('/profile'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    LargeTitle(
+                      title: 'Suscripciones',
+                      subtitle: 'Lo que pagas sin pensarlo, cada mes',
+                      trailing: [
+                        CircleButton(
+                          icon: CupertinoIcons.add,
+                          tooltip: 'Agregar suscripción',
+                          filled: true,
+                          onPressed: () => addSubscription(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    ...rules.when(
+                      loading: () => const [
+                        SizedBox(height: 160, child: AppShimmer()),
+                      ],
+                      error: (error, _) => [
+                        AppErrorState(
+                          message: error.toString(),
+                          onRetry: () => ref.invalidate(recurringProvider),
+                        ),
+                      ],
+                      data: (all) {
+                        final subs = all
+                            .where((r) => r.isSubscription)
+                            .toList();
+                        if (subs.isEmpty) return const [_EmptySubscriptions()];
+                        final active = upcomingCharges(subs);
+                        final paused = subs.where((s) => !s.active).toList();
+                        return [
+                          FadeSlideIn(child: _TotalCard(subscriptions: subs)),
+                          if (active.isNotEmpty) ...[
+                            const SizedBox(height: 24),
+                            const SectionHeader(title: 'Próximos cobros'),
+                            const SizedBox(height: 8),
+                            FadeSlideIn(
+                              index: 1,
+                              child: _SubscriptionList(subscriptions: active),
+                            ),
+                          ],
+                          if (paused.isNotEmpty) ...[
+                            const SizedBox(height: 24),
+                            const SectionHeader(title: 'En pausa'),
+                            const SizedBox(height: 8),
+                            _SubscriptionList(subscriptions: paused),
+                          ],
+                        ];
+                      },
+                    ),
+                  ],
                 ),
-                children: [
-                  Row(
-                    children: [
-                      CircleButton(
-                        icon: CupertinoIcons.chevron_left,
-                        tooltip: 'Volver',
-                        onPressed: () => context.canPop()
-                            ? context.pop()
-                            : context.go('/profile'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  LargeTitle(
-                    title: 'Suscripciones',
-                    subtitle: 'Lo que pagas sin pensarlo, cada mes',
-                    trailing: [
-                      CircleButton(
-                        icon: CupertinoIcons.add,
-                        tooltip: 'Agregar suscripción',
-                        filled: true,
-                        onPressed: () => addSubscription(context),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  ...rules.when(
-                    loading: () => const [
-                      SizedBox(height: 160, child: AppShimmer()),
-                    ],
-                    error: (error, _) => [
-                      AppErrorState(
-                        message: error.toString(),
-                        onRetry: () => ref.invalidate(recurringProvider),
-                      ),
-                    ],
-                    data: (all) {
-                      final subs = all.where((r) => r.isSubscription).toList();
-                      if (subs.isEmpty) return const [_EmptySubscriptions()];
-                      final active = upcomingCharges(subs);
-                      final paused = subs.where((s) => !s.active).toList();
-                      return [
-                        FadeSlideIn(child: _TotalCard(subscriptions: subs)),
-                        if (active.isNotEmpty) ...[
-                          const SizedBox(height: 24),
-                          const SectionHeader(title: 'Próximos cobros'),
-                          const SizedBox(height: 8),
-                          FadeSlideIn(
-                            index: 1,
-                            child: _SubscriptionList(subscriptions: active),
-                          ),
-                        ],
-                        if (paused.isNotEmpty) ...[
-                          const SizedBox(height: 24),
-                          const SectionHeader(title: 'En pausa'),
-                          const SizedBox(height: 8),
-                          _SubscriptionList(subscriptions: paused),
-                        ],
-                      ];
-                    },
-                  ),
-                ],
               ),
             ),
           ),

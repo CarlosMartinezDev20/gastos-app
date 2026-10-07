@@ -41,53 +41,59 @@ class MetricsScreen extends ConsumerWidget {
     final efficiency = ref.watch(savingsEfficiencyProvider);
     final budgets = ref.watch(budgetsProvider).value ?? const [];
 
-    return RefreshIndicator(
-      onRefresh: () => Future.wait([
-        ref.refresh(categoryExpensesProvider.future),
-        ref.refresh(savingsEfficiencyProvider.future),
-        ref.refresh(transactionsProvider(null).future),
-        ref.refresh(budgetsProvider.future),
-      ]),
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(20, 20, 20, dockClearance(context)),
-        children: [
-          LargeTitle(title: 'Análisis', subtitle: 'Cómo se reparte tu dinero'),
-          const SizedBox(height: 20),
-          const _FlowCard(),
-          const SizedBox(height: 24),
-          const BudgetsSection(),
-          const SizedBox(height: 24),
-          efficiency.when(
-            loading: () => const _MetricsLoadingCard(height: 180),
-            error: (error, _) => AppErrorState(
-              message: error.toString(),
-              onRetry: () => ref.invalidate(savingsEfficiencyProvider),
+    return CollapsingTitle(
+      title: 'Análisis',
+      child: RefreshIndicator(
+        onRefresh: () => Future.wait([
+          ref.refresh(categoryExpensesProvider.future),
+          ref.refresh(savingsEfficiencyProvider.future),
+          ref.refresh(transactionsProvider(null).future),
+          ref.refresh(budgetsProvider.future),
+        ]),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(20, 20, 20, dockClearance(context)),
+          children: [
+            LargeTitle(
+              title: 'Análisis',
+              subtitle: 'Cómo se reparte tu dinero',
             ),
-            data: (data) => _EfficiencyCard(data: data),
-          ),
-          const SizedBox(height: 24),
-          const SectionHeader(title: 'Gastos por categoría'),
-          const SizedBox(height: 8),
-          expenses.when(
-            loading: () => const _MetricsLoadingCard(height: 400),
-            error: (error, _) => AppErrorState(
-              message: error.toString(),
-              onRetry: () => ref.invalidate(categoryExpensesProvider),
-            ),
-            data: (items) => _CategoryExpensesCard(items: items),
-          ),
-          if (expenses.hasValue && efficiency.hasValue) ...[
             const SizedBox(height: 20),
-            _AnalyzeButton(
-              tip: analysisTip(
-                expenses.requireValue,
-                efficiency.requireValue,
-                budgets: budgets,
+            const _FlowCard(),
+            const SizedBox(height: 24),
+            const BudgetsSection(),
+            const SizedBox(height: 24),
+            efficiency.when(
+              loading: () => const _MetricsLoadingCard(height: 180),
+              error: (error, _) => AppErrorState(
+                message: error.toString(),
+                onRetry: () => ref.invalidate(savingsEfficiencyProvider),
               ),
+              data: (data) => _EfficiencyCard(data: data),
             ),
+            const SizedBox(height: 24),
+            const SectionHeader(title: 'Gastos por categoría'),
+            const SizedBox(height: 8),
+            expenses.when(
+              loading: () => const _MetricsLoadingCard(height: 400),
+              error: (error, _) => AppErrorState(
+                message: error.toString(),
+                onRetry: () => ref.invalidate(categoryExpensesProvider),
+              ),
+              data: (items) => _CategoryExpensesCard(items: items),
+            ),
+            if (expenses.hasValue && efficiency.hasValue) ...[
+              const SizedBox(height: 20),
+              _AnalyzeButton(
+                tip: analysisTip(
+                  expenses.requireValue,
+                  efficiency.requireValue,
+                  budgets: budgets,
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

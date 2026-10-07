@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/theme/app_palette.dart';
 import '../core/theme/motion.dart';
@@ -152,6 +153,108 @@ class _EntranceAutofocusState extends State<EntranceAutofocus> {
 
   @override
   Widget build(BuildContext context) => widget.builder(context, _focusNode);
+}
+
+/// iOS-style collapsing title: once the page scrolls past its large title,
+/// a slim bar with the title (and a back button when [onBack] is given)
+/// fades in over the content. It only rebuilds when crossing [threshold].
+class CollapsingTitle extends StatefulWidget {
+  const CollapsingTitle({
+    super.key,
+    required this.title,
+    required this.child,
+    this.onBack,
+    this.threshold = 64,
+  });
+
+  final String title;
+  final Widget child;
+  final VoidCallback? onBack;
+
+  /// Scroll offset where the large title has gone.
+  final double threshold;
+
+  @override
+  State<CollapsingTitle> createState() => _CollapsingTitleState();
+}
+
+class _CollapsingTitleState extends State<CollapsingTitle> {
+  var _collapsed = false;
+
+  bool _onScroll(ScrollNotification notification) {
+    if (notification.depth == 0 && notification.metrics.axis == Axis.vertical) {
+      final collapsed = notification.metrics.pixels > widget.threshold;
+      if (collapsed != _collapsed) setState(() => _collapsed = collapsed);
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final background = Theme.of(context).scaffoldBackgroundColor;
+    return NotificationListener<ScrollNotification>(
+      onNotification: _onScroll,
+      child: Stack(
+        children: [
+          widget.child,
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              ignoring: !_collapsed,
+              child: AnimatedOpacity(
+                opacity: _collapsed ? 1 : 0,
+                duration: Motion.of(context, Motion.fast),
+                curve: Motion.standard,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    // Opaque enough to read over the content, no blur
+                    // (cheap to paint).
+                    color: background.withValues(alpha: .96),
+                    border: Border(bottom: BorderSide(color: palette.hairline)),
+                  ),
+                  child: SizedBox(
+                    height: 48,
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 56,
+                          child: widget.onBack == null || !_collapsed
+                              ? null
+                              : IconButton(
+                                  tooltip: 'Atrás',
+                                  onPressed: widget.onBack,
+                                  icon: const Icon(CupertinoIcons.chevron_left),
+                                ),
+                        ),
+                        // Only while shown: hidden, it would repeat the
+                        // large title for screen readers (and finders).
+                        Expanded(
+                          child: !_collapsed
+                              ? const SizedBox.shrink()
+                              : Text(
+                                  widget.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                        ),
+                        const SizedBox(width: 56),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// iOS large title with optional subtitle and trailing actions.
@@ -630,7 +733,13 @@ class PillCta extends StatelessWidget {
       shape: const StadiumBorder(),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: loading ? null : onPressed,
+        // A light tap, like iOS confirming a primary action.
+        onTap: loading || onPressed == null
+            ? null
+            : () {
+                HapticFeedback.lightImpact();
+                onPressed!();
+              },
         child: SizedBox(
           height: 60,
           child: Row(
@@ -742,7 +851,10 @@ class SegmentedTabs<T> extends StatelessWidget {
                     button: true,
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onTap: () => onChanged(value),
+                      onTap: () {
+                        if (value != selected) HapticFeedback.selectionClick();
+                        onChanged(value);
+                      },
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(minHeight: 38),
                         child: Padding(
@@ -787,8 +899,14 @@ class AppSwitch extends StatelessWidget {
   Widget build(BuildContext context) {
     return CupertinoSwitch(
       value: value,
-      onChanged: onChanged,
-      activeTrackColor: Theme.of(context).colorScheme.primary,
+      onChanged: onChanged == null
+          ? null
+          : (value) {
+              HapticFeedback.selectionClick();
+              onChanged!(value);
+            },
+      // The brand's lime, like the other highlights (not the seed green).
+      activeTrackColor: context.palette.accent,
     );
   }
 }

@@ -204,158 +204,162 @@ class _PlannerState extends ConsumerState<_Planner> {
     final ready = income > 0;
     final toApply = plan.categories.where((c) => c.suggested > 0).toList();
 
-    return ListView(
-      physics: const BouncingScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(
-        20,
-        12,
-        20,
-        MediaQuery.paddingOf(context).bottom + 28,
-      ),
-      children: [
-        Row(
-          children: [
-            CircleButton(
-              icon: CupertinoIcons.chevron_left,
-              tooltip: 'Volver',
-              onPressed: () =>
-                  context.canPop() ? context.pop() : context.go('/metrics'),
+    return CollapsingTitle(
+      title: 'Calculadora',
+      onBack: () => context.canPop() ? context.pop() : context.go('/metrics'),
+      child: ListView(
+        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          12,
+          20,
+          MediaQuery.paddingOf(context).bottom + 28,
+        ),
+        children: [
+          Row(
+            children: [
+              CircleButton(
+                icon: CupertinoIcons.chevron_left,
+                tooltip: 'Volver',
+                onPressed: () =>
+                    context.canPop() ? context.pop() : context.go('/metrics'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const LargeTitle(
+            title: 'Calculadora',
+            subtitle: 'Arma tu presupuesto a partir de lo que ganas',
+          ),
+          const SizedBox(height: 20),
+          // 1. Incomes.
+          const _Step(number: 1, title: 'Tus ingresos'),
+          FadeSlideIn(
+            child: _IncomeCard(
+              sources: _sources,
+              total: income,
+              onEdit: _editSource,
+            ),
+          ),
+          const SizedBox(height: 24),
+          // 2. Split.
+          const _Step(number: 2, title: 'Cómo repartirlo'),
+          SegmentedTabs<int>(
+            selected: _splitIndex,
+            onChanged: (value) => setState(() => _splitIndex = value),
+            segments: {
+              for (final (i, s) in budgetSplits.indexed) i: s.label,
+              _customIndex: 'Propio',
+            },
+          ),
+          const SizedBox(height: 8),
+          Text(split.hint, style: TextStyle(color: palette.muted)),
+          if (_splitIndex == _customIndex) ...[
+            const SizedBox(height: 8),
+            _PercentSlider(
+              label: 'Necesidades',
+              value: _customNeeds,
+              max: 100 - _customWants,
+              onChanged: (v) => setState(() => _customNeeds = v),
+            ),
+            _PercentSlider(
+              label: 'Gustos',
+              value: _customWants,
+              max: 100 - _customNeeds,
+              onChanged: (v) => setState(() => _customWants = v),
             ),
           ],
-        ),
-        const SizedBox(height: 16),
-        const LargeTitle(
-          title: 'Calculadora',
-          subtitle: 'Arma tu presupuesto a partir de lo que ganas',
-        ),
-        const SizedBox(height: 20),
-        // 1. Incomes.
-        const _Step(number: 1, title: 'Tus ingresos'),
-        FadeSlideIn(
-          child: _IncomeCard(
-            sources: _sources,
-            total: income,
-            onEdit: _editSource,
+          const SizedBox(height: 14),
+          _SplitCard(plan: plan, split: split),
+          if (ready && plan.savings > 0 && widget.goals.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _SavingsHint(goals: widget.goals, monthly: plan.savings),
+          ],
+          const SizedBox(height: 24),
+          // 3. Limits per category.
+          const _Step(number: 3, title: 'Límite por categoría'),
+          Text(
+            'Sugerido según tu gasto de los últimos meses. Toca un monto para '
+            'cambiarlo y la etiqueta para moverlo entre necesidad y gusto.',
+            style: TextStyle(color: palette.muted),
           ),
-        ),
-        const SizedBox(height: 24),
-        // 2. Split.
-        const _Step(number: 2, title: 'Cómo repartirlo'),
-        SegmentedTabs<int>(
-          selected: _splitIndex,
-          onChanged: (value) => setState(() => _splitIndex = value),
-          segments: {
-            for (final (i, s) in budgetSplits.indexed) i: s.label,
-            _customIndex: 'Propio',
-          },
-        ),
-        const SizedBox(height: 8),
-        Text(split.hint, style: TextStyle(color: palette.muted)),
-        if (_splitIndex == _customIndex) ...[
-          const SizedBox(height: 8),
-          _PercentSlider(
-            label: 'Necesidades',
-            value: _customNeeds,
-            max: 100 - _customWants,
-            onChanged: (v) => setState(() => _customNeeds = v),
-          ),
-          _PercentSlider(
-            label: 'Gustos',
-            value: _customWants,
-            max: 100 - _customNeeds,
-            onChanged: (v) => setState(() => _customWants = v),
-          ),
-        ],
-        const SizedBox(height: 14),
-        _SplitCard(plan: plan, split: split),
-        if (ready && plan.savings > 0 && widget.goals.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _SavingsHint(goals: widget.goals, monthly: plan.savings),
-        ],
-        const SizedBox(height: 24),
-        // 3. Limits per category.
-        const _Step(number: 3, title: 'Límite por categoría'),
-        Text(
-          'Sugerido según tu gasto de los últimos meses. Toca un monto para '
-          'cambiarlo y la etiqueta para moverlo entre necesidad y gusto.',
-          style: TextStyle(color: palette.muted),
-        ),
-        const SizedBox(height: 10),
-        if (_averages.isEmpty)
-          BentoCard(
-            child: Row(
-              children: [
-                const Mascot(mood: MascotMood.sleepy, size: 56),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'No tienes categorías de gasto todavía.',
-                    style: TextStyle(color: palette.muted),
-                  ),
-                ),
-              ],
-            ),
-          )
-        else
-          BentoCard(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Column(
-              children: [
-                for (final (i, item) in plan.categories.indexed) ...[
-                  if (i > 0) const Divider(indent: 72, height: 1),
-                  _SuggestionRow(
-                    item: item,
-                    ready: ready,
-                    onEdit: () => _editLimit(item),
-                    onToggle: () => setState(() {
-                      final id = item.category.id;
-                      if (!_needIds.remove(id)) _needIds.add(id);
-                    }),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        if (ready) ...[
           const SizedBox(height: 10),
-          for (final note in _notes(plan))
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
+          if (_averages.isEmpty)
+            BentoCard(
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    CupertinoIcons.info_circle,
-                    size: 16,
-                    color: palette.muted,
-                  ),
-                  const SizedBox(width: 6),
+                  const Mascot(mood: MascotMood.sleepy, size: 56),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      note,
-                      style: text.bodySmall?.copyWith(color: palette.muted),
+                      'No tienes categorías de gasto todavía.',
+                      style: TextStyle(color: palette.muted),
                     ),
                   ),
                 ],
               ),
+            )
+          else
+            BentoCard(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Column(
+                children: [
+                  for (final (i, item) in plan.categories.indexed) ...[
+                    if (i > 0) const Divider(indent: 72, height: 1),
+                    _SuggestionRow(
+                      item: item,
+                      ready: ready,
+                      onEdit: () => _editLimit(item),
+                      onToggle: () => setState(() {
+                        final id = item.category.id;
+                        if (!_needIds.remove(id)) _needIds.add(id);
+                      }),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          if (ready) ...[
+            const SizedBox(height: 10),
+            for (final note in _notes(plan))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      CupertinoIcons.info_circle,
+                      size: 16,
+                      color: palette.muted,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        note,
+                        style: text.bodySmall?.copyWith(color: palette.muted),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+          const SizedBox(height: 16),
+          if (!ready)
+            Text(
+              'Agrega al menos un ingreso para calcular.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: palette.muted),
+            )
+          else if (toApply.isNotEmpty)
+            PillCta(
+              label:
+                  'Aplicar ${toApply.length} '
+                  '${toApply.length == 1 ? 'presupuesto' : 'presupuestos'}',
+              loading: _applying,
+              onPressed: () => _apply(toApply),
             ),
         ],
-        const SizedBox(height: 16),
-        if (!ready)
-          Text(
-            'Agrega al menos un ingreso para calcular.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: palette.muted),
-          )
-        else if (toApply.isNotEmpty)
-          PillCta(
-            label:
-                'Aplicar ${toApply.length} '
-                '${toApply.length == 1 ? 'presupuesto' : 'presupuestos'}',
-            loading: _applying,
-            onPressed: () => _apply(toApply),
-          ),
-      ],
+      ),
     );
   }
 

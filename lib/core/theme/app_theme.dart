@@ -167,8 +167,10 @@ class AppTheme {
           color: palette.onPill,
           fontWeight: FontWeight.w700,
         ),
+        // iOS-like capsules: the selected one fills black, no checkmark.
+        showCheckmark: false,
         checkmarkColor: palette.onPill,
-        shape: pillShape,
+        shape: const StadiumBorder(),
         side: BorderSide(color: palette.hairline),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       ),

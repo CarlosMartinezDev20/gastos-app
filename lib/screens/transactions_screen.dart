@@ -124,195 +124,215 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     final expenses = filtered
         .where((t) => t.type == TransactionType.expense)
         .fold(0.0, (total, t) => total + t.amount);
-    final rows = <({String? heading, Transaction? transaction})>[];
+    // One inset group per day, like a grouped iOS list.
+    final days = <({String heading, List<Transaction> items})>[];
     DateTime? previousDay;
     for (final transaction in filtered) {
       final local = transaction.date.toLocal();
       final day = DateTime(local.year, local.month, local.day);
       if (day != previousDay) {
-        rows.add((heading: Formatters.dayLabel(day), transaction: null));
+        days.add((heading: Formatters.dayLabel(day), items: []));
         previousDay = day;
       }
-      rows.add((heading: null, transaction: transaction));
+      days.last.items.add(transaction);
     }
 
-    return RefreshIndicator(
-      onRefresh: () => ref.refresh(transactionsProvider(null).future),
-      child: CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-            sliver: SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  LargeTitle(
-                    title: 'Movimientos',
-                    subtitle: 'Cada ingreso y cada gasto',
-                    trailing: [
-                      CircleButton(
-                        icon: CupertinoIcons.arrow_down_doc,
-                        tooltip: 'Exportar CSV',
-                        onPressed: () => _export(filtered),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  CupertinoSearchTextField(
-                    controller: _search,
-                    placeholder: 'Buscar por nombre o categoría',
-                    onChanged: (_) => setState(() {}),
-                    onSuffixTap: () => setState(_search.clear),
-                    backgroundColor: palette.card,
-                    style: Theme.of(context).textTheme.bodyLarge,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SegmentedTabs(
-                          selected: _type,
-                          onChanged: (value) => setState(() => _type = value),
-                          segments: const {
-                            _TypeFilter.all: 'Todos',
-                            _TypeFilter.expense: 'Gastos',
-                            _TypeFilter.income: 'Ingresos',
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      CircleButton(
-                        icon: CupertinoIcons.calendar,
-                        tooltip: 'Filtrar por fechas',
-                        filled: _range != null,
-                        onPressed: _pickDates,
-                      ),
-                    ],
-                  ),
-                  if (_range != null) ...[
-                    const SizedBox(height: 10),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: InputChip(
-                        avatar: const Icon(CupertinoIcons.calendar, size: 16),
-                        label: Text(
-                          '${Formatters.fullDate.format(_range!.start)} – ${Formatters.fullDate.format(_range!.end)}',
-                        ),
-                        onDeleted: () => setState(() => _range = null),
-                        deleteButtonTooltipMessage: 'Quitar filtro de fechas',
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _SummaryTile(
-                          label: 'Ingresos',
-                          amount: income,
-                          color: palette.mint,
-                          onColor: palette.onMint,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _SummaryTile(
-                          label: 'Gastos',
-                          amount: expenses,
-                          color: palette.blush,
-                          onColor: palette.onBlush,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '${filtered.length} ${filtered.length == 1 ? 'movimiento' : 'movimientos'} · balance ${Formatters.compactMoney(income - expenses)}',
-                          style: TextStyle(color: palette.muted),
-                        ),
-                      ),
-                      if (hasFilters)
-                        TextButton(
-                          onPressed: _reset,
-                          child: const Text('Limpiar filtros'),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (filtered.isEmpty)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+    return CollapsingTitle(
+      title: 'Movimientos',
+      child: RefreshIndicator(
+        onRefresh: () => ref.refresh(transactionsProvider(null).future),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+              sliver: SliverToBoxAdapter(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    AppEmptyState(
-                      title: items.isEmpty
-                          ? 'Tu historial empieza aquí'
-                          : 'Sin coincidencias',
-                      subtitle: items.isEmpty
-                          ? 'Registra tu primer movimiento para empezar a llevar el control.'
-                          : 'Prueba otro nombre o cambia los filtros.',
-                    ),
-                    if (items.isEmpty)
-                      FilledButton.icon(
-                        onPressed: () => showNewTransactionSheet(
-                          context,
-                          initialType: TransactionType.expense,
+                    LargeTitle(
+                      title: 'Movimientos',
+                      subtitle: 'Cada ingreso y cada gasto',
+                      trailing: [
+                        CircleButton(
+                          icon: CupertinoIcons.arrow_down_doc,
+                          tooltip: 'Exportar CSV',
+                          onPressed: () => _export(filtered),
                         ),
-                        icon: const Icon(CupertinoIcons.add),
-                        label: const Text('Registrar movimiento'),
-                      )
-                    else
-                      TextButton(
-                        onPressed: _reset,
-                        child: const Text('Ver todos los movimientos'),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    CupertinoSearchTextField(
+                      controller: _search,
+                      placeholder: 'Buscar por nombre o categoría',
+                      onChanged: (_) => setState(() {}),
+                      onSuffixTap: () => setState(_search.clear),
+                      backgroundColor: palette.card,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 12,
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SegmentedTabs(
+                            selected: _type,
+                            onChanged: (value) => setState(() => _type = value),
+                            segments: const {
+                              _TypeFilter.all: 'Todos',
+                              _TypeFilter.expense: 'Gastos',
+                              _TypeFilter.income: 'Ingresos',
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        CircleButton(
+                          icon: CupertinoIcons.calendar,
+                          tooltip: 'Filtrar por fechas',
+                          filled: _range != null,
+                          onPressed: _pickDates,
+                        ),
+                      ],
+                    ),
+                    if (_range != null) ...[
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: InputChip(
+                          avatar: const Icon(CupertinoIcons.calendar, size: 16),
+                          label: Text(
+                            '${Formatters.fullDate.format(_range!.start)} – ${Formatters.fullDate.format(_range!.end)}',
+                          ),
+                          onDeleted: () => setState(() => _range = null),
+                          deleteButtonTooltipMessage: 'Quitar filtro de fechas',
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _SummaryTile(
+                            label: 'Ingresos',
+                            amount: income,
+                            color: palette.mint,
+                            onColor: palette.onMint,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _SummaryTile(
+                            label: 'Gastos',
+                            amount: expenses,
+                            color: palette.blush,
+                            onColor: palette.onBlush,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${filtered.length} ${filtered.length == 1 ? 'movimiento' : 'movimientos'} · balance ${Formatters.compactMoney(income - expenses)}',
+                            style: TextStyle(color: palette.muted),
+                          ),
+                        ),
+                        if (hasFilters)
+                          TextButton(
+                            onPressed: _reset,
+                            child: const Text('Limpiar filtros'),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
               ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              sliver: SliverList.builder(
-                itemCount: rows.length,
-                itemBuilder: (context, index) {
-                  final row = rows[index];
-                  if (row.heading != null) {
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
-                      child: Text(
-                        row.heading!,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.titleSmall?.copyWith(color: palette.muted),
-                      ),
-                    );
-                  }
-                  return Material(
-                    key: ValueKey(row.transaction!.id),
-                    color: palette.card,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: TransactionTile(transaction: row.transaction!),
-                    ),
-                  );
-                },
-              ),
             ),
-          SliverToBoxAdapter(child: SizedBox(height: dockClearance(context))),
-        ],
+            if (filtered.isEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    children: [
+                      AppEmptyState(
+                        title: items.isEmpty
+                            ? 'Tu historial empieza aquí'
+                            : 'Sin coincidencias',
+                        subtitle: items.isEmpty
+                            ? 'Registra tu primer movimiento para empezar a llevar el control.'
+                            : 'Prueba otro nombre o cambia los filtros.',
+                      ),
+                      if (items.isEmpty)
+                        FilledButton.icon(
+                          onPressed: () => showNewTransactionSheet(
+                            context,
+                            initialType: TransactionType.expense,
+                          ),
+                          icon: const Icon(CupertinoIcons.add),
+                          label: const Text('Registrar movimiento'),
+                        )
+                      else
+                        TextButton(
+                          onPressed: _reset,
+                          child: const Text('Ver todos los movimientos'),
+                        ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverList.builder(
+                  itemCount: days.length,
+                  itemBuilder: (context, index) {
+                    final day = days[index];
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
+                          child: Text(
+                            day.heading,
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(color: palette.muted),
+                          ),
+                        ),
+                        BentoCard(
+                          padding: EdgeInsets.zero,
+                          child: Column(
+                            children: [
+                              for (final (i, t) in day.items.indexed) ...[
+                                if (i > 0)
+                                  Divider(
+                                    height: 1,
+                                    indent: 72,
+                                    color: palette.hairline,
+                                  ),
+                                Padding(
+                                  key: ValueKey(t.id),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                  ),
+                                  child: TransactionTile(transaction: t),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            SliverToBoxAdapter(child: SizedBox(height: dockClearance(context))),
+          ],
+        ),
       ),
     );
   }

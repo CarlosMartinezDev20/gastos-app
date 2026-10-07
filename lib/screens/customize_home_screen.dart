@@ -63,80 +63,88 @@ class CustomizeHomeScreen extends ConsumerWidget {
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
-            child: ListView(
-              physics: const BouncingScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(
-                20,
-                12,
-                20,
-                MediaQuery.paddingOf(context).bottom + 28,
-              ),
-              children: [
-                Row(
-                  children: [
-                    CircleButton(
-                      icon: CupertinoIcons.chevron_left,
-                      tooltip: 'Volver',
-                      onPressed: () => context.canPop()
-                          ? context.pop()
-                          : context.go('/home'),
-                    ),
-                  ],
+            child: CollapsingTitle(
+              title: 'Tu inicio',
+              onBack: () =>
+                  context.canPop() ? context.pop() : context.go('/home'),
+              child: ListView(
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  12,
+                  20,
+                  MediaQuery.paddingOf(context).bottom + 28,
                 ),
-                const SizedBox(height: 16),
-                LargeTitle(
-                  title: 'Tu inicio',
-                  subtitle: 'Elige, ordena y dale color a tus widgets',
-                  trailing: [
-                    CircleButton(
-                      icon: CupertinoIcons.arrow_counterclockwise,
-                      tooltip: 'Restablecer',
-                      onPressed: () async {
-                        final ok = await confirmAction(
-                          context,
-                          title: '¿Restablecer tu inicio?',
-                          message: 'Volverán los widgets y colores de siempre.',
-                          confirmLabel: 'Restablecer',
-                        );
-                        if (ok) {
-                          ref.read(homeLayoutProvider.notifier).reset();
-                        }
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                const FadeSlideIn(child: SectionHeader(title: 'En tu inicio')),
-                const SizedBox(height: 8),
-                FadeSlideIn(
-                  index: 1,
-                  child: layout.isEmpty
-                      ? BentoCard(
-                          child: Text(
-                            'No hay widgets. Añade alguno de abajo.',
-                            style: TextStyle(color: context.palette.muted),
-                          ),
-                        )
-                      : _CurrentWidgets(layout: layout),
-                ),
-                if (available.isNotEmpty) ...[
-                  const SizedBox(height: 28),
+                children: [
+                  Row(
+                    children: [
+                      CircleButton(
+                        icon: CupertinoIcons.chevron_left,
+                        tooltip: 'Volver',
+                        onPressed: () => context.canPop()
+                            ? context.pop()
+                            : context.go('/home'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  LargeTitle(
+                    title: 'Tu inicio',
+                    subtitle: 'Elige, ordena y dale color a tus widgets',
+                    trailing: [
+                      CircleButton(
+                        icon: CupertinoIcons.arrow_counterclockwise,
+                        tooltip: 'Restablecer',
+                        onPressed: () async {
+                          final ok = await confirmAction(
+                            context,
+                            title: '¿Restablecer tu inicio?',
+                            message:
+                                'Volverán los widgets y colores de siempre.',
+                            confirmLabel: 'Restablecer',
+                          );
+                          if (ok) {
+                            ref.read(homeLayoutProvider.notifier).reset();
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
                   const FadeSlideIn(
-                    index: 2,
-                    child: SectionHeader(title: 'Añadir widgets'),
+                    child: SectionHeader(title: 'En tu inicio'),
                   ),
                   const SizedBox(height: 8),
-                  for (final (i, type) in available.indexed) ...[
-                    if (i > 0) const SizedBox(height: 14),
-                    FadeSlideIn(
-                      index: 3 + i,
-                      child: _GalleryItem(type: type, data: dashboard.value),
+                  FadeSlideIn(
+                    index: 1,
+                    child: layout.isEmpty
+                        ? BentoCard(
+                            child: Text(
+                              'No hay widgets. Añade alguno de abajo.',
+                              style: TextStyle(color: context.palette.muted),
+                            ),
+                          )
+                        : _CurrentWidgets(layout: layout),
+                  ),
+                  if (available.isNotEmpty) ...[
+                    const SizedBox(height: 28),
+                    const FadeSlideIn(
+                      index: 2,
+                      child: SectionHeader(title: 'Añadir widgets'),
                     ),
+                    const SizedBox(height: 8),
+                    for (final (i, type) in available.indexed) ...[
+                      if (i > 0) const SizedBox(height: 14),
+                      FadeSlideIn(
+                        index: 3 + i,
+                        child: _GalleryItem(type: type, data: dashboard.value),
+                      ),
+                    ],
                   ],
+                  const SizedBox(height: 28),
+                  const FadeSlideIn(index: 4, child: PhoneWidgetSection()),
                 ],
-                const SizedBox(height: 28),
-                const FadeSlideIn(index: 4, child: PhoneWidgetSection()),
-              ],
+              ),
             ),
           ),
         ),

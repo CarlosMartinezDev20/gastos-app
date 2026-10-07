@@ -101,6 +101,9 @@ Future<void> scrollTo(WidgetTester tester, Finder finder) async {
     scrollable: find.byType(Scrollable).first,
   );
   await tester.pumpAndSettle();
+  // Centered: at the top edge the collapsed title bar could cover it.
+  await Scrollable.ensureVisible(tester.element(finder.first), alignment: .5);
+  await tester.pumpAndSettle();
 }
 
 /// Taps the back button at the top of a full-screen page.
@@ -695,8 +698,7 @@ void main() {
     await scrollTo(tester, find.textContaining(r'Te pasaste por $10.00'));
     expect(find.text('150%'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('150%'));
-    await tester.pumpAndSettle();
+    await scrollTo(tester, find.text('150%'));
     await tester.tap(find.text('150%'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField), '60');
@@ -704,8 +706,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('50%'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('50%'));
-    await tester.pumpAndSettle();
+    await scrollTo(tester, find.text('50%'));
     await tester.tap(find.text('50%'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Quitar presupuesto'));
@@ -876,8 +877,11 @@ void main() {
     await tester.tap(find.byTooltip('Personalizar inicio'));
     await tester.pumpAndSettle();
     await scrollTo(tester, find.byTooltip('Añadir Tarjetas'));
-    // Fully on screen, not just its edge, before tapping it.
-    await tester.ensureVisible(find.byTooltip('Añadir Tarjetas'));
+    // Centered: at the top edge the collapsed title bar would cover it.
+    await Scrollable.ensureVisible(
+      tester.element(find.byTooltip('Añadir Tarjetas')),
+      alignment: .5,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Añadir Tarjetas'));
     await tester.pumpAndSettle();

@@ -41,163 +41,169 @@ class ProfileScreen extends ConsumerWidget {
             .map((p) => p[0])
             .join()
             .toUpperCase();
-        return ListView(
-          physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(20, 20, 20, dockClearance(context)),
-          children: [
-            LargeTitle(title: 'Perfil', trailing: const [ThemeToggle()]),
-            const SizedBox(height: 20),
-            BentoCard(
-              color: palette.ink,
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: palette.accent,
-                    child: Text(
-                      initials.isEmpty ? 'U' : initials,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: palette.onAccent,
-                        fontWeight: FontWeight.w700,
+        return CollapsingTitle(
+          title: 'Perfil',
+          child: ListView(
+            physics: const BouncingScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(20, 20, 20, dockClearance(context)),
+            children: [
+              LargeTitle(title: 'Perfil', trailing: const [ThemeToggle()]),
+              const SizedBox(height: 20),
+              BentoCard(
+                color: palette.ink,
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundColor: palette.accent,
+                      child: Text(
+                        initials.isEmpty ? 'U' : initials,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: palette.onAccent,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user.name,
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(color: palette.onInk),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          user.email,
-                          style: TextStyle(color: palette.inkMuted),
-                        ),
-                      ],
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            user.name,
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(color: palette.onInk),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            user.email,
+                            style: TextStyle(color: palette.inkMuted),
+                          ),
+                        ],
+                      ),
                     ),
+                    IconButton(
+                      tooltip: 'Editar nombre',
+                      onPressed: () => _editName(context, ref, user.name),
+                      color: palette.onInk,
+                      icon: const Icon(CupertinoIcons.pencil),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+              InsetGroup(
+                header: 'Finanzas',
+                children: [
+                  InsetTile(
+                    icon: CupertinoIcons.creditcard_fill,
+                    iconColor: const Color(0xFF1E3A8A),
+                    title: 'Mi wallet',
+                    onTap: () => context.push('/wallet'),
                   ),
-                  IconButton(
-                    tooltip: 'Editar nombre',
-                    onPressed: () => _editName(context, ref, user.name),
-                    color: palette.onInk,
-                    icon: const Icon(CupertinoIcons.pencil),
+                  InsetTile(
+                    icon: CupertinoIcons.play_rectangle_fill,
+                    iconColor: const Color(0xFFE5484D),
+                    title: 'Suscripciones',
+                    onTap: () => context.push('/subscriptions'),
+                  ),
+                  InsetTile(
+                    icon: CupertinoIcons.square_grid_2x2_fill,
+                    iconColor: const Color(0xFF6E8B00),
+                    title: 'Categorías',
+                    onTap: () => context.push('/categories'),
+                  ),
+                  InsetTile(
+                    icon: CupertinoIcons.slider_horizontal_3,
+                    iconColor: const Color(0xFF7A5AF8),
+                    title: 'Calculadora de presupuestos',
+                    onTap: () => context.push('/budget-planner'),
+                  ),
+                  InsetTile(
+                    icon: CupertinoIcons.repeat,
+                    iconColor: const Color(0xFF3B82C4),
+                    title: 'Movimientos recurrentes',
+                    onTap: () => context.push('/recurring'),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 28),
-            InsetGroup(
-              header: 'Finanzas',
-              children: [
-                InsetTile(
-                  icon: CupertinoIcons.creditcard_fill,
-                  iconColor: const Color(0xFF1E3A8A),
-                  title: 'Mi wallet',
-                  onTap: () => context.push('/wallet'),
-                ),
-                InsetTile(
-                  icon: CupertinoIcons.play_rectangle_fill,
-                  iconColor: const Color(0xFFE5484D),
-                  title: 'Suscripciones',
-                  onTap: () => context.push('/subscriptions'),
-                ),
-                InsetTile(
-                  icon: CupertinoIcons.square_grid_2x2_fill,
-                  iconColor: const Color(0xFF6E8B00),
-                  title: 'Categorías',
-                  onTap: () => context.push('/categories'),
-                ),
-                InsetTile(
-                  icon: CupertinoIcons.slider_horizontal_3,
-                  iconColor: const Color(0xFF7A5AF8),
-                  title: 'Calculadora de presupuestos',
-                  onTap: () => context.push('/budget-planner'),
-                ),
-                InsetTile(
-                  icon: CupertinoIcons.repeat,
-                  iconColor: const Color(0xFF3B82C4),
-                  title: 'Movimientos recurrentes',
-                  onTap: () => context.push('/recurring'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            InsetGroup(
-              header: 'Preferencias',
-              children: [
-                InsetTile(
-                  icon: CupertinoIcons.moon_fill,
-                  iconColor: const Color(0xFF6E56CF),
-                  title: 'Tema oscuro',
-                  trailing: AppSwitch(
-                    value: darkMode,
-                    onChanged: (value) => ThemeCrossfade.run(
-                      context,
-                      () => ref
-                          .read(themeControllerProvider.notifier)
-                          .setDarkMode(value),
-                    ),
-                  ),
-                ),
-                if (ref.watch(paymentReminderServiceProvider).supported)
+              const SizedBox(height: 24),
+              InsetGroup(
+                header: 'Preferencias',
+                children: [
                   InsetTile(
-                    icon: CupertinoIcons.bell_fill,
-                    iconColor: const Color(0xFFE5484D),
-                    title: 'Recordatorios de pago',
+                    icon: CupertinoIcons.moon_fill,
+                    iconColor: const Color(0xFF6E56CF),
+                    title: 'Tema oscuro',
                     trailing: AppSwitch(
-                      value: ref.watch(paymentRemindersEnabledProvider),
-                      onChanged: (value) async {
-                        final messenger = ScaffoldMessenger.of(context);
-                        final on = await ref
-                            .read(paymentRemindersEnabledProvider.notifier)
-                            .set(value);
-                        if (value && !on) {
-                          messenger.showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Activa las notificaciones de la app en los '
-                                'ajustes del teléfono.',
-                              ),
-                            ),
-                          );
-                        }
-                      },
+                      value: darkMode,
+                      onChanged: (value) => ThemeCrossfade.run(
+                        context,
+                        () => ref
+                            .read(themeControllerProvider.notifier)
+                            .setDarkMode(value),
+                      ),
                     ),
                   ),
-                InsetTile(
-                  icon: CupertinoIcons.money_dollar_circle_fill,
-                  iconColor: const Color(0xFF0E8A5F),
-                  title: 'Moneda',
-                  trailing: Text('USD', style: TextStyle(color: palette.muted)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            InsetGroup(
-              children: [
-                InsetTile(
-                  icon: CupertinoIcons.square_arrow_right,
-                  title: 'Cerrar sesión',
-                  destructive: true,
-                  onTap: () => _confirmLogout(context, ref),
-                ),
-              ],
-            ),
-            const SizedBox(height: 28),
-            Center(
-              child: Text(
-                AppConstants.footer,
-                style: Theme.of(
-                  context,
-                ).textTheme.labelSmall?.copyWith(color: palette.muted),
+                  if (ref.watch(paymentReminderServiceProvider).supported)
+                    InsetTile(
+                      icon: CupertinoIcons.bell_fill,
+                      iconColor: const Color(0xFFE5484D),
+                      title: 'Recordatorios de pago',
+                      trailing: AppSwitch(
+                        value: ref.watch(paymentRemindersEnabledProvider),
+                        onChanged: (value) async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          final on = await ref
+                              .read(paymentRemindersEnabledProvider.notifier)
+                              .set(value);
+                          if (value && !on) {
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Activa las notificaciones de la app en los '
+                                  'ajustes del teléfono.',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  InsetTile(
+                    icon: CupertinoIcons.money_dollar_circle_fill,
+                    iconColor: const Color(0xFF0E8A5F),
+                    title: 'Moneda',
+                    trailing: Text(
+                      'USD',
+                      style: TextStyle(color: palette.muted),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 24),
+              InsetGroup(
+                children: [
+                  InsetTile(
+                    icon: CupertinoIcons.square_arrow_right,
+                    title: 'Cerrar sesión',
+                    destructive: true,
+                    onTap: () => _confirmLogout(context, ref),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 28),
+              Center(
+                child: Text(
+                  AppConstants.footer,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelSmall?.copyWith(color: palette.muted),
+                ),
+              ),
+            ],
+          ),
         );
       },
     );

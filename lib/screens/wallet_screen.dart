@@ -37,76 +37,81 @@ class WalletScreen extends ConsumerWidget {
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 560),
-            child: RefreshIndicator(
-              onRefresh: () => Future.wait([
-                ref.refresh(paymentMethodsProvider.future),
-                ref.refresh(transactionsProvider(null).future),
-              ]),
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(
-                  20,
-                  12,
-                  20,
-                  MediaQuery.paddingOf(context).bottom + 28,
-                ),
-                children: [
-                  Row(
-                    children: [
-                      CircleButton(
-                        icon: CupertinoIcons.chevron_left,
-                        tooltip: 'Volver',
-                        onPressed: () => context.canPop()
-                            ? context.pop()
-                            : context.go('/profile'),
-                      ),
-                    ],
+            child: CollapsingTitle(
+              title: 'Mi wallet',
+              onBack: () =>
+                  context.canPop() ? context.pop() : context.go('/profile'),
+              child: RefreshIndicator(
+                onRefresh: () => Future.wait([
+                  ref.refresh(paymentMethodsProvider.future),
+                  ref.refresh(transactionsProvider(null).future),
+                ]),
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    12,
+                    20,
+                    MediaQuery.paddingOf(context).bottom + 28,
                   ),
-                  const SizedBox(height: 16),
-                  LargeTitle(
-                    title: 'Mi wallet',
-                    subtitle: 'Tus tarjetas y formas de pago',
-                    trailing: [
-                      CircleButton(
-                        icon: CupertinoIcons.add,
-                        tooltip: 'Agregar método de pago',
-                        filled: true,
-                        onPressed: () => showPaymentMethodSheet(context),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  ...methods.when(
-                    loading: () => const [
-                      SizedBox(height: 200, child: AppShimmer()),
-                    ],
-                    error: (error, _) => [
-                      AppErrorState(
-                        message: error.toString(),
-                        onRetry: () => ref.invalidate(paymentMethodsProvider),
-                      ),
-                    ],
-                    data: (items) => items.isEmpty
-                        ? const [_EmptyWallet()]
-                        : [
-                            for (final (i, method) in items.indexed) ...[
-                              if (i > 0) const SizedBox(height: 22),
-                              FadeSlideIn(
-                                index: i,
-                                child: _WalletEntry(
-                                  summary: summarizeMethod(
-                                    method,
-                                    transactions,
-                                    now,
+                  children: [
+                    Row(
+                      children: [
+                        CircleButton(
+                          icon: CupertinoIcons.chevron_left,
+                          tooltip: 'Volver',
+                          onPressed: () => context.canPop()
+                              ? context.pop()
+                              : context.go('/profile'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    LargeTitle(
+                      title: 'Mi wallet',
+                      subtitle: 'Tus tarjetas y formas de pago',
+                      trailing: [
+                        CircleButton(
+                          icon: CupertinoIcons.add,
+                          tooltip: 'Agregar método de pago',
+                          filled: true,
+                          onPressed: () => showPaymentMethodSheet(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    ...methods.when(
+                      loading: () => const [
+                        SizedBox(height: 200, child: AppShimmer()),
+                      ],
+                      error: (error, _) => [
+                        AppErrorState(
+                          message: error.toString(),
+                          onRetry: () => ref.invalidate(paymentMethodsProvider),
+                        ),
+                      ],
+                      data: (items) => items.isEmpty
+                          ? const [_EmptyWallet()]
+                          : [
+                              for (final (i, method) in items.indexed) ...[
+                                if (i > 0) const SizedBox(height: 22),
+                                FadeSlideIn(
+                                  index: i,
+                                  child: _WalletEntry(
+                                    summary: summarizeMethod(
+                                      method,
+                                      transactions,
+                                      now,
+                                    ),
                                   ),
                                 ),
-                              ),
+                              ],
                             ],
-                          ],
-                  ),
-                  const SizedBox(height: 24),
-                  const _PrivacyNote(),
-                ],
+                    ),
+                    const SizedBox(height: 24),
+                    const _PrivacyNote(),
+                  ],
+                ),
               ),
             ),
           ),
