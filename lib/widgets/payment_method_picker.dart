@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_palette.dart';
 import '../models/payment_method.dart';
 import '../screens/payment_method_sheet.dart';
 import 'wallet_card.dart';
@@ -35,6 +36,8 @@ class PaymentMethodPicker extends StatelessWidget {
               height: 16,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
+                // Keeps a black card's dot visible on a dark chip.
+                border: Border.all(color: context.palette.hairline),
                 gradient: LinearGradient(
                   colors: walletCardStyle(method.color).colors,
                 ),

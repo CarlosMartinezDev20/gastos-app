@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -232,122 +233,132 @@ class _FlowChart extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 16,
-            children: [
-              legend(palette.chartIncome, 'Ingresos'),
-              legend(palette.chartExpense, 'Gastos'),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 170,
-            child: maxY == 0
-                ? Center(
-                    child: Text(
-                      'Sin movimientos en este periodo',
-                      style: TextStyle(color: palette.muted),
-                    ),
-                  )
-                : BarChart(
-                    duration: Motion.of(context, Motion.medium),
-                    BarChartData(
-                      alignment: BarChartAlignment.spaceAround,
-                      maxY: maxY == 0 ? 1 : maxY * 1.1,
-                      gridData: FlGridData(
-                        drawVerticalLine: false,
-                        horizontalInterval: maxY == 0 ? 1 : maxY / 3,
-                        getDrawingHorizontalLine: (_) => FlLine(
-                          color: scheme.onSurface.withValues(alpha: .06),
-                          strokeWidth: 1,
-                        ),
-                      ),
-                      borderData: FlBorderData(show: false),
-                      titlesData: FlTitlesData(
-                        topTitles: const AxisTitles(),
-                        rightTitles: const AxisTitles(),
-                        leftTitles: const AxisTitles(),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 26,
-                            getTitlesWidget: (value, meta) {
-                              final i = value.toInt();
-                              if (i < 0 || i >= buckets.length) {
-                                return const SizedBox.shrink();
-                              }
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 6),
-                                child: Text(
-                                  _label(buckets[i]),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: i == buckets.length - 1
-                                        ? scheme.onSurface
-                                        : palette.muted,
-                                    fontWeight: i == buckets.length - 1
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                      barTouchData: BarTouchData(
-                        touchTooltipData: BarTouchTooltipData(
-                          getTooltipColor: (_) => palette.pill,
-                          fitInsideHorizontally: true,
-                          fitInsideVertically: true,
-                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                            if (rodIndex != 0) return null;
-                            final b = buckets[groupIndex];
-                            final style = TextStyle(
-                              color: palette.onPill,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            );
-                            return BarTooltipItem(
-                              '${_tooltipTitle(b)}\n',
-                              style.copyWith(fontWeight: FontWeight.w700),
-                              children: [
-                                TextSpan(
-                                  text:
-                                      'Ingresos ${Formatters.compactMoney(b.income)}\n'
-                                      'Gastos ${Formatters.compactMoney(b.spent)}',
-                                  style: style,
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
-                      barGroups: [
-                        for (var i = 0; i < buckets.length; i++)
-                          BarChartGroupData(
-                            x: i,
-                            barsSpace: 2,
-                            barRods: [
-                              for (final (value, color) in [
-                                (buckets[i].income, palette.chartIncome),
-                                (buckets[i].spent, palette.chartExpense),
-                              ])
-                                BarChartRodData(
-                                  toY: value,
-                                  color: color,
-                                  width: period == FlowPeriod.year ? 7 : 12,
-                                  borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(4),
-                                  ),
-                                ),
-                            ],
-                          ),
-                      ],
+          // Nothing to chart: a short note instead of an empty plot.
+          if (maxY == 0) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Icon(CupertinoIcons.chart_bar, color: palette.muted, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Sin movimientos en este periodo',
+                    style: TextStyle(color: palette.muted),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 16,
+              children: [
+                legend(palette.chartIncome, 'Ingresos'),
+                legend(palette.chartExpense, 'Gastos'),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 170,
+              child: BarChart(
+                duration: Motion.of(context, Motion.medium),
+                BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY: maxY == 0 ? 1 : maxY * 1.1,
+                  gridData: FlGridData(
+                    drawVerticalLine: false,
+                    horizontalInterval: maxY == 0 ? 1 : maxY / 3,
+                    getDrawingHorizontalLine: (_) => FlLine(
+                      color: scheme.onSurface.withValues(alpha: .06),
+                      strokeWidth: 1,
                     ),
                   ),
-          ),
+                  borderData: FlBorderData(show: false),
+                  titlesData: FlTitlesData(
+                    topTitles: const AxisTitles(),
+                    rightTitles: const AxisTitles(),
+                    leftTitles: const AxisTitles(),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 26,
+                        getTitlesWidget: (value, meta) {
+                          final i = value.toInt();
+                          if (i < 0 || i >= buckets.length) {
+                            return const SizedBox.shrink();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              _label(buckets[i]),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: i == buckets.length - 1
+                                    ? scheme.onSurface
+                                    : palette.muted,
+                                fontWeight: i == buckets.length - 1
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  barTouchData: BarTouchData(
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipColor: (_) => palette.pill,
+                      fitInsideHorizontally: true,
+                      fitInsideVertically: true,
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        if (rodIndex != 0) return null;
+                        final b = buckets[groupIndex];
+                        final style = TextStyle(
+                          color: palette.onPill,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        );
+                        return BarTooltipItem(
+                          '${_tooltipTitle(b)}\n',
+                          style.copyWith(fontWeight: FontWeight.w700),
+                          children: [
+                            TextSpan(
+                              text:
+                                  'Ingresos ${Formatters.compactMoney(b.income)}\n'
+                                  'Gastos ${Formatters.compactMoney(b.spent)}',
+                              style: style,
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  barGroups: [
+                    for (var i = 0; i < buckets.length; i++)
+                      BarChartGroupData(
+                        x: i,
+                        barsSpace: 2,
+                        barRods: [
+                          for (final (value, color) in [
+                            (buckets[i].income, palette.chartIncome),
+                            (buckets[i].spent, palette.chartExpense),
+                          ])
+                            BarChartRodData(
+                              toY: value,
+                              color: color,
+                              width: period == FlowPeriod.year ? 7 : 12,
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(4),
+                              ),
+                            ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
