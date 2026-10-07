@@ -41,8 +41,7 @@ Future<FakeBackend> pumpApp(
 
   final backend = FakeBackend(withData: withData);
   if (loggedIn) backend.token = 'token';
-  SharedPreferences.setMockInitialValues({
-  });
+  SharedPreferences.setMockInitialValues({});
   final prefs = await SharedPreferences.getInstance();
 
   await tester.pumpWidget(
