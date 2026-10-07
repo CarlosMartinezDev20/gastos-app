@@ -718,6 +718,43 @@ void main() {
     expect(find.text('••••••'), findsOneWidget);
   });
 
+  testWidgets('the cards widget on Inicio shows what is owed', (tester) async {
+    final backend = await pumpApp(tester);
+    backend.paymentMethods.add(
+      const PaymentMethod(
+        id: 'visa',
+        name: 'Visa',
+        kind: PaymentMethodKind.creditCard,
+        color: 'ink',
+        last4: '4821',
+      ),
+    );
+    backend.transactions.add(
+      Transaction(
+        id: 'buy',
+        title: 'Zapatos',
+        amount: 60,
+        type: TransactionType.expense,
+        date: DateTime.now(),
+        category: food,
+        paymentMethodId: 'visa',
+      ),
+    );
+    await tester.tap(find.byTooltip('Personalizar inicio'));
+    await tester.pumpAndSettle();
+    await scrollTo(tester, find.byTooltip('Añadir Tarjetas'));
+    await tester.tap(find.byTooltip('Añadir Tarjetas'));
+    await tester.pumpAndSettle();
+    await goBack(tester);
+
+    await scrollTo(tester, find.text('Mis tarjetas'));
+    expect(find.text('Visa ··4821'), findsOneWidget);
+    expect(find.text(r'Debes $60.00'), findsOneWidget);
+    await tester.tap(find.text('Mis tarjetas'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mi wallet'), findsOneWidget);
+  });
+
   testWidgets('customizes the widgets on Inicio', (tester) async {
     await pumpApp(tester);
     final prefs = await SharedPreferences.getInstance();

@@ -25,6 +25,7 @@ IconData homeWidgetIcon(HomeWidgetType type) => switch (type) {
   HomeWidgetType.week => CupertinoIcons.chart_bar,
   HomeWidgetType.goals => CupertinoIcons.flag,
   HomeWidgetType.budgets => CupertinoIcons.gauge,
+  HomeWidgetType.wallet => CupertinoIcons.creditcard_fill,
   HomeWidgetType.recent => CupertinoIcons.list_bullet,
   HomeWidgetType.quickAdd => CupertinoIcons.bolt,
 };

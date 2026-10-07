@@ -36,6 +36,11 @@ enum HomeWidgetType {
     'Cuánto llevas gastado de tus límites del mes.',
     sizes: [HomeWidgetSize.compact, HomeWidgetSize.wide],
   ),
+  wallet(
+    'Tarjetas',
+    'Lo que debes y gastas con cada tarjeta de tu wallet.',
+    sizes: [HomeWidgetSize.wide, HomeWidgetSize.compact],
+  ),
   recent(
     'Actividad reciente',
     'Tus últimos movimientos.',

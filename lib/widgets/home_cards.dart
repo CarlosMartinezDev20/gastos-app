@@ -10,6 +10,7 @@ import '../core/utils/finance_insights.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/home_layout.dart';
 import '../core/utils/mascot_insights.dart';
+import '../core/utils/wallet.dart';
 import '../models/budget.dart';
 import '../models/category.dart';
 import '../models/dashboard.dart';
@@ -26,6 +27,7 @@ import 'icon_mapper.dart';
 import 'ios_ui.dart';
 import 'mascot.dart';
 import 'transaction_tile.dart';
+import 'wallet_card.dart';
 import '../core/theme/motion.dart';
 
 /// Colors a home widget is drawn with, from its [HomeWidgetStyle].
@@ -136,6 +138,7 @@ class HomeCard extends StatelessWidget {
         tone: tone,
       ),
       HomeWidgetType.budgets => _BudgetsCard(compact: compact, tone: tone),
+      HomeWidgetType.wallet => _WalletHomeCard(compact: compact, tone: tone),
       HomeWidgetType.recent => _RecentActivity(transactions: data.transactions),
       HomeWidgetType.quickAdd => _QuickAddCard(compact: compact, tone: tone),
     };
@@ -1072,6 +1075,130 @@ class _QuickAddCard extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// The wallet on Inicio: what is owed on credit cards (compact), or each
+/// method with its debt or this month's spending (wide).
+class _WalletHomeCard extends ConsumerWidget {
+  const _WalletHomeCard({required this.compact, required this.tone});
+
+  final bool compact;
+  final HomeTone tone;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final methods = ref.watch(paymentMethodsProvider).value ?? const [];
+    final transactions =
+        ref.watch(transactionsProvider(null)).value ?? const <Transaction>[];
+    final now = DateTime.now();
+    final summaries = [
+      for (final m in methods) summarizeMethod(m, transactions, now),
+    ];
+    final credit = summaries.where((s) => s.debt != null).toList();
+    final owed = credit.fold(0.0, (sum, s) => sum + math.max(0, s.debt!));
+    final spentThisMonth = summaries.fold(0.0, (sum, s) => sum + s.spent);
+    final amountStyle = TextStyle(
+      fontSize: compact ? 24 : 28,
+      fontWeight: FontWeight.w800,
+      letterSpacing: -.5,
+      color: tone.foreground,
+    );
+    return _ToneCard(
+      tone: tone,
+      onTap: () => context.push('/wallet'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _CardTitle(
+            compact ? 'Tarjetas' : 'Mis tarjetas',
+            CupertinoIcons.creditcard,
+          ),
+          if (summaries.isEmpty) ...[
+            const SizedBox(height: 18),
+            const Text(
+              'Agrega tus tarjetas y efectivo para ver cuánto gastas con '
+              'cada uno.',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ] else if (compact) ...[
+            const SizedBox(height: 18),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                Formatters.compactMoney(credit.isEmpty ? spentThisMonth : owed),
+                style: amountStyle,
+              ),
+            ),
+            Text(
+              credit.isEmpty ? 'Gastado este mes' : 'Debes en tus tarjetas',
+              maxLines: 2,
+              style: TextStyle(color: tone.muted, fontSize: 13),
+            ),
+          ] else
+            for (final summary in summaries.take(3)) ...[
+              const SizedBox(height: 14),
+              _WalletRow(summary: summary, tone: tone),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+class _WalletRow extends StatelessWidget {
+  const _WalletRow({required this.summary, required this.tone});
+
+  final WalletSummary summary;
+  final HomeTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final method = summary.method;
+    final debt = summary.debt;
+    final value = debt == null
+        ? '${Formatters.compactMoney(summary.spent)} este mes'
+        : debt > 0
+        ? 'Debes ${Formatters.compactMoney(debt)}'
+        : 'Al día';
+    return Row(
+      children: [
+        // A tiny version of the card art.
+        Container(
+          width: 34,
+          height: 22,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(5),
+            gradient: LinearGradient(
+              colors: walletCardStyle(method.color).colors,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            method.shortLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: debt != null && debt > 0 ? tone.foreground : tone.muted,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
