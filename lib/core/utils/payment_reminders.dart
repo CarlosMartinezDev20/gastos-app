@@ -1,5 +1,7 @@
 import 'package:intl/intl.dart';
 
+import '../../models/payment_method.dart';
+import '../../models/recurring.dart';
 import 'formatters.dart';
 import 'wallet.dart';
 
@@ -51,8 +53,8 @@ List<PlannedReminder> planPaymentReminders(
     if (due == null || debt == null || debt <= 0) continue;
     final name = summary.method.shortLabel;
     final owed = Formatters.compactMoney(debt);
-    // Notification ids are 32-bit: a positive slot per card, two kinds.
-    final slot = (summary.method.id.hashCode & 0x3fffffff) * 2;
+    // Notification ids are 32-bit: cards below 2^29, subscriptions above.
+    final slot = (summary.method.id.hashCode & 0x0fffffff) * 2;
     final dueAt = DateTime(due.year, due.month, due.day, reminderHour);
     final early = DateTime(
       due.year,
@@ -80,6 +82,39 @@ List<PlannedReminder> planPaymentReminders(
         ),
       );
     }
+  }
+  return reminders;
+}
+
+/// A reminder the day before each active subscription charges, at 9:00.
+List<PlannedReminder> planSubscriptionReminders(
+  List<RecurringRule> subscriptions,
+  List<PaymentMethod> methods,
+  DateTime now,
+) {
+  final reminders = <PlannedReminder>[];
+  for (final s in subscriptions) {
+    if (!s.active || !s.isSubscription) continue;
+    final charge = s.nextDate.toLocal();
+    final when = DateTime(
+      charge.year,
+      charge.month,
+      charge.day - 1,
+      reminderHour,
+    );
+    if (!when.isAfter(now)) continue;
+    final method = methods.where((m) => m.id == s.paymentMethodId).firstOrNull;
+    reminders.add(
+      PlannedReminder(
+        id: 0x40000000 + (s.id.hashCode & 0x0fffffff),
+        when: when,
+        title: 'Mañana se cobra ${s.title}',
+        body: [
+          Formatters.compactMoney(s.amount),
+          if (method != null) 'con ${method.shortLabel}',
+        ].join(' '),
+      ),
+    );
   }
   return reminders;
 }

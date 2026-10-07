@@ -41,6 +41,11 @@ enum HomeWidgetType {
     'Lo que debes y gastas con cada tarjeta de tu wallet.',
     sizes: [HomeWidgetSize.wide, HomeWidgetSize.compact],
   ),
+  subscriptions(
+    'Suscripciones',
+    'Cuánto pagas al mes y cuál se cobra primero.',
+    sizes: [HomeWidgetSize.compact, HomeWidgetSize.wide],
+  ),
   recent(
     'Actividad reciente',
     'Tus últimos movimientos.',

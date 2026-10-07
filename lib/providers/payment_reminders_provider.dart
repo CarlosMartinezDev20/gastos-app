@@ -56,13 +56,15 @@ final paymentRemindersSyncProvider = Provider<void>((ref) {
   }
   final methods = ref.watch(paymentMethodsProvider).value;
   final transactions = ref.watch(transactionsProvider(null)).value;
-  if (methods == null || transactions == null) return;
+  final recurring = ref.watch(recurringProvider).value;
+  if (methods == null || transactions == null || recurring == null) return;
   final now = DateTime.now();
   unawaited(
-    service.schedule(
-      planPaymentReminders([
+    service.schedule([
+      ...planPaymentReminders([
         for (final m in methods) summarizeMethod(m, transactions, now),
       ], now),
-    ),
+      ...planSubscriptionReminders(recurring, methods, now),
+    ]),
   );
 });

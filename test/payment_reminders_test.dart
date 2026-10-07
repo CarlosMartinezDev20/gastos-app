@@ -2,6 +2,7 @@ import 'package:appgastos/core/utils/payment_reminders.dart';
 import 'package:appgastos/core/utils/wallet.dart';
 import 'package:appgastos/models/category.dart';
 import 'package:appgastos/models/payment_method.dart';
+import 'package:appgastos/models/recurring.dart';
 import 'package:appgastos/models/transaction.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -69,5 +70,36 @@ void main() {
   test('nothing for paid-up cards or without a due day', () {
     expect(plan(card(paid: 120), DateTime(2026, 10, 2)), isEmpty);
     expect(plan(card(dueDay: null), DateTime(2026, 10, 2)), isEmpty);
+  });
+
+  test('a reminder the day before each active subscription charge', () {
+    RecurringRule sub(String id, DateTime next, {bool active = true}) =>
+        RecurringRule(
+          id: id,
+          title: 'Netflix',
+          amount: 9.99,
+          type: TransactionType.expense,
+          category: food,
+          frequency: RecurrenceFrequency.monthly,
+          nextDate: next,
+          active: active,
+          service: 'netflix',
+          paymentMethodId: 'visa',
+        );
+    final reminders = planSubscriptionReminders(
+      [
+        sub('a', DateTime(2026, 10, 15, 12)),
+        sub('paused', DateTime(2026, 10, 15, 12), active: false),
+        sub('tomorrow', DateTime(2026, 10, 3, 12)),
+      ],
+      [card()],
+      DateTime(2026, 10, 2, 10),
+    );
+    expect(reminders, hasLength(1), reason: 'paused / already past skipped');
+    expect(reminders.single.when, DateTime(2026, 10, 14, 9));
+    expect(reminders.single.title, 'Mañana se cobra Netflix');
+    expect(reminders.single.body, r'$9.99 con Visa ··4821');
+    final cardIds = plan(card(), DateTime(2026, 10, 2)).map((r) => r.id);
+    expect(cardIds, everyElement(lessThan(reminders.single.id)));
   });
 }

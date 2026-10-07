@@ -137,6 +137,7 @@ class FinanceRepository {
     required RecurrenceFrequency frequency,
     required DateTime startDate,
     String? paymentMethodId,
+    String? service,
   }) async {
     try {
       final response = await _api.dio.post(
@@ -149,6 +150,7 @@ class FinanceRepository {
           'frequency': frequency.apiValue,
           'startDate': startDate.toUtc().toIso8601String(),
           'paymentMethodId': ?paymentMethodId,
+          'service': ?service,
         },
       );
       return RecurringRule.fromJson(response.data as Map<String, dynamic>);

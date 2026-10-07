@@ -18,6 +18,7 @@ import 'category_sheet.dart';
 import 'new_transaction_sheet.dart';
 import '../core/theme/motion.dart';
 import '../widgets/payment_method_picker.dart';
+import '../widgets/service_logo.dart';
 
 /// Weekly and monthly movements the API creates on its own.
 class RecurringScreen extends ConsumerWidget {
@@ -105,13 +106,7 @@ class _RecurringList extends StatelessWidget {
     // Net monthly effect of the active rules (a week ≈ 4.33 per month).
     double monthly(TransactionType type) => items
         .where((r) => r.active && r.type == type)
-        .fold(
-          0.0,
-          (sum, r) =>
-              sum +
-              r.amount *
-                  (r.frequency == RecurrenceFrequency.weekly ? 52 / 12 : 1),
-        );
+        .fold(0.0, (sum, r) => sum + r.monthlyCost);
     final income = monthly(TransactionType.income);
     final expense = monthly(TransactionType.expense);
     return Column(
@@ -227,15 +222,21 @@ class _RecurringRow extends ConsumerWidget {
       contentPadding: const EdgeInsets.only(left: 14, right: 6),
       leading: Opacity(
         opacity: rule.active ? 1 : .45,
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: tile,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Icon(iconFromApi(rule.category.icon), color: onTile, size: 22),
-        ),
+        child: rule.isSubscription
+            ? ServiceLogo(serviceKey: rule.service, name: rule.title)
+            : Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: tile,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  iconFromApi(rule.category.icon),
+                  color: onTile,
+                  size: 22,
+                ),
+              ),
       ),
       title: Text(
         rule.title,
@@ -398,6 +399,7 @@ class _RecurringSheetState extends ConsumerState<_RecurringSheet> {
                 segments: const {
                   RecurrenceFrequency.weekly: 'Cada semana',
                   RecurrenceFrequency.monthly: 'Cada mes',
+                  RecurrenceFrequency.yearly: 'Cada año',
                 },
               ),
               const SizedBox(height: 16),

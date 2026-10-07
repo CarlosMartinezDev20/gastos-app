@@ -101,6 +101,12 @@ class ProfileScreen extends ConsumerWidget {
                   onTap: () => context.push('/wallet'),
                 ),
                 InsetTile(
+                  icon: CupertinoIcons.play_rectangle_fill,
+                  iconColor: const Color(0xFFE5484D),
+                  title: 'Suscripciones',
+                  onTap: () => context.push('/subscriptions'),
+                ),
+                InsetTile(
                   icon: CupertinoIcons.square_grid_2x2_fill,
                   iconColor: const Color(0xFF6E8B00),
                   title: 'Categorías',

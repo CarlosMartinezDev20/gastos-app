@@ -39,6 +39,7 @@ const _icons = <String, IconData>{
   'storefront': Icons.storefront_outlined,
   'account_balance_wallet': Icons.account_balance_wallet_outlined,
   'auto_awesome': Icons.auto_awesome_outlined,
+  'subscriptions': Icons.subscriptions_outlined,
 };
 
 /// Icon names offered when creating or editing a category.

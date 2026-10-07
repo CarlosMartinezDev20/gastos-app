@@ -110,6 +110,8 @@ Future<void> goBack(WidgetTester tester) async {
     -300,
     scrollable: find.byType(Scrollable).first,
   );
+  await tester.ensureVisible(find.byTooltip('Volver'));
+  await tester.pumpAndSettle();
   await tester.tap(find.byTooltip('Volver'));
   await tester.pumpAndSettle();
 }
@@ -801,6 +803,54 @@ void main() {
     );
   });
 
+  testWidgets('adds a subscription from the catalog and pauses it', (
+    tester,
+  ) async {
+    final backend = await pumpApp(tester);
+    await openProfile(tester);
+    await scrollTo(tester, find.text('Suscripciones'));
+    await tester.tap(find.text('Suscripciones'));
+    await tester.pumpAndSettle();
+    expect(find.text('Todavía no tienes suscripciones'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Spotify'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Precio'),
+      '5.99',
+    );
+    await scrollTo(tester, find.text('Agregar suscripción').last);
+    await tester.tap(find.text('Agregar suscripción').last);
+    await tester.pumpAndSettle();
+
+    final rule = backend.recurring.single;
+    expect(rule.service, 'spotify');
+    expect(rule.title, 'Spotify');
+    expect(rule.category.name, 'Suscripciones', reason: 'created for it');
+    expect(
+      rule.nextDate.isAfter(DateTime.now()),
+      isTrue,
+      reason: 'no charge today',
+    );
+    expect(find.text(r'$5.99'), findsWidgets);
+    expect(find.text(r'$71.88 al año · 1 activa'), findsOneWidget);
+
+    await tester.tap(find.text('Spotify'));
+    await tester.pumpAndSettle();
+    await scrollTo(tester, find.text('Activa'));
+    await tester.tap(
+      find.descendant(
+        of: find.widgetWithText(InsetTile, 'Activa'),
+        matching: find.byType(CupertinoSwitch),
+      ),
+    );
+    await scrollTo(tester, find.text('Guardar cambios'));
+    await tester.tap(find.text('Guardar cambios'));
+    await tester.pumpAndSettle();
+    expect(backend.recurring.single.active, isFalse);
+    expect(find.text('En pausa'), findsWidgets);
+  });
+
   testWidgets('the cards widget on Inicio shows what is owed', (tester) async {
     final backend = await pumpApp(tester);
     backend.paymentMethods.add(
@@ -826,6 +876,9 @@ void main() {
     await tester.tap(find.byTooltip('Personalizar inicio'));
     await tester.pumpAndSettle();
     await scrollTo(tester, find.byTooltip('Añadir Tarjetas'));
+    // Fully on screen, not just its edge, before tapping it.
+    await tester.ensureVisible(find.byTooltip('Añadir Tarjetas'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Añadir Tarjetas'));
     await tester.pumpAndSettle();
     await goBack(tester);

@@ -15,6 +15,7 @@ import '../screens/metrics_screen.dart';
 import '../screens/new_goal_full_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/splash_screen.dart';
+import '../screens/subscriptions_screen.dart';
 import '../screens/transactions_screen.dart';
 import '../screens/wallet_screen.dart';
 import '../widgets/app_shell.dart';
@@ -103,6 +104,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/wallet',
         builder: (context, state) => const WalletScreen(),
+      ),
+      GoRoute(
+        path: '/subscriptions',
+        builder: (context, state) => const SubscriptionsScreen(),
       ),
       ShellRoute(
         pageBuilder: (context, state, child) =>

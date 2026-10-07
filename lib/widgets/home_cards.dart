@@ -10,10 +10,12 @@ import '../core/utils/finance_insights.dart';
 import '../core/utils/formatters.dart';
 import '../core/utils/home_layout.dart';
 import '../core/utils/mascot_insights.dart';
+import '../core/utils/subscriptions.dart';
 import '../core/utils/wallet.dart';
 import '../models/budget.dart';
 import '../models/category.dart';
 import '../models/dashboard.dart';
+import '../models/recurring.dart';
 import '../models/savings_goal.dart';
 import '../models/transaction.dart';
 import '../providers/finance_providers.dart';
@@ -27,6 +29,7 @@ import 'icon_mapper.dart';
 import 'ios_ui.dart';
 import 'mascot.dart';
 import 'transaction_tile.dart';
+import 'service_logo.dart';
 import 'wallet_card.dart';
 import '../core/theme/motion.dart';
 
@@ -139,6 +142,10 @@ class HomeCard extends StatelessWidget {
       ),
       HomeWidgetType.budgets => _BudgetsCard(compact: compact, tone: tone),
       HomeWidgetType.wallet => _WalletHomeCard(compact: compact, tone: tone),
+      HomeWidgetType.subscriptions => _SubscriptionsHomeCard(
+        compact: compact,
+        tone: tone,
+      ),
       HomeWidgetType.recent => _RecentActivity(transactions: data.transactions),
       HomeWidgetType.quickAdd => _QuickAddCard(compact: compact, tone: tone),
     };
@@ -1199,6 +1206,99 @@ class _WalletRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Subscriptions on Inicio: the monthly total and the next charge
+/// (compact), or the next three charges (wide).
+class _SubscriptionsHomeCard extends ConsumerWidget {
+  const _SubscriptionsHomeCard({required this.compact, required this.tone});
+
+  final bool compact;
+  final HomeTone tone;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final subs = [
+      for (final r
+          in ref.watch(recurringProvider).value ?? const <RecurringRule>[])
+        if (r.isSubscription) r,
+    ];
+    final upcoming = upcomingCharges(subs);
+    final next = upcoming.firstOrNull;
+    return _ToneCard(
+      tone: tone,
+      onTap: () => context.push('/subscriptions'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _CardTitle(
+            'Suscripciones',
+            CupertinoIcons.play_rectangle,
+            trailing: subs.isEmpty || compact
+                ? null
+                : '${Formatters.compactMoney(monthlySubscriptionCost(subs))}/mes',
+          ),
+          if (subs.isEmpty) ...[
+            const SizedBox(height: 18),
+            const Text(
+              'Agrega ChatGPT, Spotify, Netflix… y ve cuánto suman.',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ] else if (compact) ...[
+            const SizedBox(height: 18),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                Formatters.compactMoney(monthlySubscriptionCost(subs)),
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -.5,
+                  color: tone.foreground,
+                ),
+              ),
+            ),
+            Text(
+              next == null
+                  ? 'al mes'
+                  : 'al mes · ${next.title} ${chargeLabel(next.nextDate).toLowerCase()}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: tone.muted, fontSize: 13),
+            ),
+          ] else
+            for (final s in upcoming.take(3)) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  ServiceLogo(serviceKey: s.service, name: s.title, size: 34),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      s.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    chargeLabel(s.nextDate),
+                    style: TextStyle(color: tone.muted, fontSize: 13),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    Formatters.compactMoney(s.amount),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+            ],
+        ],
+      ),
     );
   }
 }

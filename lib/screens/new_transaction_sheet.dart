@@ -223,7 +223,7 @@ class _NewTransactionSheetState extends ConsumerState<NewTransactionSheet> {
             _editing
                 ? 'Movimiento actualizado'
                 : _repeat != null
-                ? 'Se repetirá cada ${_repeat == RecurrenceFrequency.weekly ? 'semana' : 'mes'}'
+                ? 'Se repetirá ${_repeat!.every}'
                 : _type == TransactionType.income
                 ? 'Ingreso registrado'
                 : 'Gasto registrado',
