@@ -5,8 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/theme/app_theme.dart';
 import 'navigation/app_router.dart';
+import 'providers/phone_widget_provider.dart';
 import 'providers/storage_provider.dart';
 import 'providers/theme_provider.dart';
+import 'widgets/theme_crossfade.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,19 +25,27 @@ Future<void> main() async {
 class AppGastosApp extends ConsumerWidget {
   const AppGastosApp({super.key});
 
+  // Building ThemeData is not free; do it once instead of on every rebuild.
+  static final _light = AppTheme.light();
+  static final _dark = AppTheme.dark();
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeControllerProvider);
+    ref.watch(phoneWidgetSyncProvider);
     return MaterialApp.router(
       title: 'Finanzas M3',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
+      theme: _light,
+      darkTheme: _dark,
       themeMode: themeMode,
-      themeAnimationDuration: const Duration(milliseconds: 160),
-      themeAnimationCurve: Curves.easeOutCubic,
+      // The theme switches at once under ThemeCrossfade's fading snapshot;
+      // lerping it would rebuild every widget on every frame.
+      themeAnimationDuration: Duration.zero,
+      scrollBehavior: const AppScrollBehavior(),
       routerConfig: router,
+      builder: (context, child) => ThemeCrossfade(child: child!),
     );
   }
 }

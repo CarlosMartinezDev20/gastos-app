@@ -16,7 +16,7 @@ class ApiClient {
         BaseOptions(
           baseUrl: const String.fromEnvironment(
             'API_BASE_URL',
-            defaultValue: 'http://localhost:3000',
+            defaultValue: 'http://localhost:3001',
           ),
           connectTimeout: const Duration(seconds: 15),
           receiveTimeout: const Duration(seconds: 15),
@@ -32,7 +32,17 @@ class ApiClient {
           }
           handler.next(options);
         },
-        onError: (error, handler) => handler.reject(error),
+        onError: (error, handler) {
+          final hadToken =
+              error.requestOptions.headers['Authorization'] != null;
+          if (error.response?.statusCode == 401 && hadToken) {
+            // Expired or revoked token: drop the session instead of failing
+            // every screen with "Unauthorized".
+            clearToken();
+            onUnauthorized?.call();
+          }
+          handler.reject(error);
+        },
       ),
     );
   }
@@ -40,6 +50,9 @@ class ApiClient {
   static const _tokenKey = 'access_token';
   final SharedPreferences _prefs;
   final Dio dio;
+
+  /// Called when an authenticated request gets a 401. Set by AuthController.
+  void Function()? onUnauthorized;
 
   String? get token => _prefs.getString(_tokenKey);
 

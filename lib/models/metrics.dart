@@ -36,9 +36,12 @@ class SavingsEfficiency {
 
   String get message {
     if (totalIncome == 0) return 'Registra ingresos para medir tu eficiencia.';
-    if (efficiencyPercent >= 25) return 'Excelente ritmo de ahorro este mes.';
+    if (efficiencyPercent >= 25) return 'Excelente ritmo de ahorro.';
     if (efficiencyPercent >= 10) {
       return 'Vas bien, tu ahorro está tomando forma.';
+    }
+    if (totalSaved == 0) {
+      return 'Aporta a una meta para empezar a medir tu ahorro.';
     }
     return 'Pequeños aportes constantes pueden subir tu eficiencia.';
   }

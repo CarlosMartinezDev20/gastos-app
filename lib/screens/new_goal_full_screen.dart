@@ -1,13 +1,15 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 
-import '../core/constants/app_colors.dart';
+import '../core/utils/formatters.dart';
 import '../providers/finance_providers.dart';
 import '../services/savings_service.dart';
 import '../widgets/icon_mapper.dart';
-import '../widgets/soft_card.dart';
+import '../core/theme/app_palette.dart';
+import '../widgets/ios_ui.dart';
 import 'new_goal_sheet.dart';
 
 class NewGoalFullScreen extends ConsumerStatefulWidget {
@@ -21,17 +23,13 @@ class _NewGoalFullScreenState extends ConsumerState<NewGoalFullScreen> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _amount = TextEditingController();
-  final _description = TextEditingController();
-  DateTime? _deadline;
   String _icon = goalIcons.first.api;
-  Color _color = AppColors.primary;
   bool _saving = false;
 
   @override
   void dispose() {
     _name.dispose();
     _amount.dispose();
-    _description.dispose();
     super.dispose();
   }
 
@@ -66,135 +64,167 @@ class _NewGoalFullScreenState extends ConsumerState<NewGoalFullScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final amount = double.tryParse(_amount.text.replaceAll(',', '.')) ?? 0;
+    final palette = context.palette;
+    // Same header as the other full-screen pages (Categorías, Calculadora):
+    // a round back button and a large title instead of a Material app bar.
     return Scaffold(
-      appBar: AppBar(title: const Text('Crear Meta')),
       body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(22, 12, 22, 30),
-            children: [
-              SoftCard(
-                color: _color.withValues(alpha: .12),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: _color,
-                      child: Icon(iconFromApi(_icon), color: Colors.white),
-                    ),
-                    const Gap(14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _name.text.isEmpty ? 'Nombre de meta' : _name.text,
-                            style: const TextStyle(fontWeight: FontWeight.w900),
-                          ),
-                          Text(
-                            amount <= 0
-                                ? 'Monto objetivo'
-                                : r'$ '
-                                      '$amount',
-                          ),
-                        ],
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: Form(
+              key: _formKey,
+              child: ListView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(22, 12, 22, 30),
+                children: [
+                  Row(
+                    children: [
+                      CircleButton(
+                        icon: CupertinoIcons.chevron_left,
+                        tooltip: 'Volver',
+                        onPressed: () => context.canPop()
+                            ? context.pop()
+                            : context.go('/goals'),
                       ),
+                    ],
+                  ),
+                  const Gap(16),
+                  const LargeTitle(
+                    title: 'Nueva meta',
+                    subtitle: 'Ponle nombre y monto a lo que quieres lograr',
+                  ),
+                  const Gap(18),
+                  BentoCard(
+                    color: palette.lilac,
+                    child: Row(
+                      children: [
+                        // Icon tile like the goal cards, on the lilac preview.
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: palette.card,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Icon(
+                            iconFromApi(_icon),
+                            color: palette.onLilac,
+                          ),
+                        ),
+                        const Gap(14),
+                        // Only the preview follows each key, not the page.
+                        Expanded(
+                          child: ListenableBuilder(
+                            listenable: Listenable.merge([_name, _amount]),
+                            builder: (context, _) {
+                              final amount =
+                                  double.tryParse(
+                                    _amount.text.replaceAll(',', '.'),
+                                  ) ??
+                                  0;
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _name.text.trim().isEmpty
+                                        ? 'Nombre de la meta'
+                                        : _name.text.trim(),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: palette.onLilac,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  Text(
+                                    amount <= 0
+                                        ? 'Monto objetivo'
+                                        : Formatters.compactMoney(amount),
+                                    style: TextStyle(color: palette.onLilac),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-              const Gap(18),
-              TextFormField(
-                controller: _name,
-                decoration: const InputDecoration(labelText: 'Nombre de meta'),
-                onChanged: (_) => setState(() {}),
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Escribe un nombre' : null,
-              ),
-              const Gap(14),
-              TextFormField(
-                controller: _amount,
-                decoration: const InputDecoration(
-                  labelText: 'Monto objetivo',
-                  prefixText: r'$ ',
-                ),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                onChanged: (_) => setState(() {}),
-                validator: (v) {
-                  final parsed = double.tryParse(
-                    (v ?? '').replaceAll(',', '.'),
-                  );
-                  return parsed == null || parsed <= 0 ? 'Monto válido' : null;
-                },
-              ),
-              const Gap(14),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: goalIcons
-                    .map(
-                      (option) => ChoiceChip(
-                        avatar: Icon(iconFromApi(option.api), size: 18),
-                        label: Text(option.label),
-                        selected: option.api == _icon,
-                        onSelected: (_) => setState(() => _icon = option.api),
+                  ),
+                  const Gap(18),
+                  EntranceAutofocus(
+                    builder: (context, focusNode) => TextFormField(
+                      controller: _name,
+                      focusNode: focusNode,
+                      textCapitalization: TextCapitalization.sentences,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'Nombre de la meta',
+                        hintText: 'Ej. Nueva laptop',
                       ),
-                    )
-                    .toList(),
-              ),
-              const Gap(14),
-              Wrap(
-                spacing: 10,
-                children:
-                    [
-                          AppColors.primary,
-                          AppColors.income,
-                          const Color(0xFF5465FF),
-                          const Color(0xFFFFB000),
-                        ]
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Escribe un nombre'
+                          : null,
+                    ),
+                  ),
+                  const Gap(14),
+                  TextFormField(
+                    controller: _amount,
+                    decoration: const InputDecoration(
+                      labelText: 'Monto objetivo',
+                      prefixText: r'$ ',
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    validator: (v) {
+                      final parsed = double.tryParse(
+                        (v ?? '').replaceAll(',', '.'),
+                      );
+                      return parsed == null || parsed <= 0
+                          ? 'Ingresa un monto mayor a 0'
+                          : null;
+                    },
+                  ),
+                  const Gap(18),
+                  Text(
+                    'Ícono',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const Gap(10),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: goalIcons
                         .map(
-                          (color) => InkWell(
-                            onTap: () => setState(() => _color = color),
-                            child: CircleAvatar(backgroundColor: color),
+                          (option) => ChoiceChip(
+                            avatar: Icon(iconFromApi(option.api), size: 18),
+                            label: Text(option.label),
+                            selected: option.api == _icon,
+                            onSelected: (_) =>
+                                setState(() => _icon = option.api),
                           ),
                         )
                         .toList(),
+                  ),
+                  const Gap(24),
+                  FilledButton.icon(
+                    onPressed: _saving ? null : _save,
+                    icon: _saving
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.flag_outlined),
+                    label: const Text('Crear meta'),
+                  ),
+                ],
               ),
-              const Gap(14),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.event_outlined),
-                title: Text(
-                  _deadline == null
-                      ? 'Fecha límite'
-                      : '${_deadline!.day}/${_deadline!.month}/${_deadline!.year}',
-                ),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    firstDate: DateTime.now(),
-                    lastDate: DateTime(2100),
-                    initialDate: DateTime.now(),
-                  );
-                  if (picked != null) setState(() => _deadline = picked);
-                },
-              ),
-              TextField(
-                controller: _description,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Descripción opcional',
-                ),
-              ),
-              const Gap(20),
-              FilledButton(
-                onPressed: _saving ? null : _save,
-                child: const Text('Crear Meta'),
-              ),
-            ],
+            ),
           ),
         ),
       ),

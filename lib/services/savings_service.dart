@@ -33,4 +33,25 @@ class SavingsService {
   Future<SavingsGoal> addFunds(String goalId, double amount) {
     return _ref.read(financeRepositoryProvider).addFunds(goalId, amount);
   }
+
+  Future<SavingsGoal> withdraw(String goalId, double amount) {
+    return _ref
+        .read(financeRepositoryProvider)
+        .withdrawFromGoal(goalId, amount);
+  }
+
+  Future<SavingsGoal> updateGoal(
+    String id, {
+    required String name,
+    required double targetAmount,
+    required String icon,
+  }) {
+    return _ref
+        .read(financeRepositoryProvider)
+        .updateGoal(id, name: name, targetAmount: targetAmount, icon: icon);
+  }
+
+  Future<void> deleteGoal(String id) {
+    return _ref.read(financeRepositoryProvider).deleteGoal(id);
+  }
 }

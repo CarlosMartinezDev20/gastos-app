@@ -19,6 +19,8 @@ class TransactionService {
     required TransactionType type,
     required String categoryId,
     required DateTime date,
+    String? paymentMethodId,
+    String? reference,
   }) {
     return _ref
         .read(financeRepositoryProvider)
@@ -28,6 +30,36 @@ class TransactionService {
           type: type,
           categoryId: categoryId,
           date: date,
+          paymentMethodId: paymentMethodId,
+          reference: reference,
         );
+  }
+
+  Future<Transaction> update(
+    String id, {
+    required String title,
+    required double amount,
+    required TransactionType type,
+    required String categoryId,
+    required DateTime date,
+    String? paymentMethodId,
+    String? reference,
+  }) {
+    return _ref
+        .read(financeRepositoryProvider)
+        .updateTransaction(
+          id,
+          title: title,
+          amount: amount,
+          type: type,
+          categoryId: categoryId,
+          date: date,
+          paymentMethodId: paymentMethodId,
+          reference: reference,
+        );
+  }
+
+  Future<void> delete(String id) {
+    return _ref.read(financeRepositoryProvider).deleteTransaction(id);
   }
 }

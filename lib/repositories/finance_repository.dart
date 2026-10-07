@@ -1,11 +1,14 @@
 import '../core/network/api_client.dart';
 import '../core/network/api_endpoints.dart';
+import '../models/budget.dart';
 import '../models/category.dart';
 import '../models/dashboard.dart';
 import '../models/metrics.dart';
+import '../models/recurring.dart';
 import '../models/savings_goal.dart';
 import '../models/transaction.dart';
 import '../models/user_profile.dart';
+import '../models/payment_method.dart';
 import 'auth_repository.dart';
 
 class FinanceRepository {
@@ -40,6 +43,149 @@ class FinanceRepository {
     }
   }
 
+  Future<Category> createCategory({
+    required String name,
+    required String icon,
+    required TransactionType type,
+  }) async {
+    try {
+      final response = await _api.dio.post(
+        ApiEndpoints.categories,
+        data: {'name': name, 'icon': icon, 'type': type.apiValue},
+      );
+      return Category.fromJson(response.data as Map<String, dynamic>);
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  Future<Category> updateCategory(
+    String id, {
+    required String name,
+    required String icon,
+    required TransactionType type,
+  }) async {
+    try {
+      final response = await _api.dio.patch(
+        ApiEndpoints.category(id),
+        data: {'name': name, 'icon': icon, 'type': type.apiValue},
+      );
+      return Category.fromJson(response.data as Map<String, dynamic>);
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  Future<void> deleteCategory(String id) async {
+    try {
+      await _api.dio.delete(ApiEndpoints.category(id));
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  /// Budgets with what was spent since [monthStart] (local start of month).
+  Future<List<Budget>> budgets(DateTime monthStart) async {
+    try {
+      final response = await _api.dio.get(
+        ApiEndpoints.budgets,
+        queryParameters: {'from': monthStart.toUtc().toIso8601String()},
+      );
+      return (response.data as List)
+          .map((e) => Budget.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  Future<void> setBudget(String categoryId, double amount) async {
+    try {
+      await _api.dio.put(
+        ApiEndpoints.budget(categoryId),
+        data: {'amount': amount},
+      );
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  Future<void> deleteBudget(String categoryId) async {
+    try {
+      await _api.dio.delete(ApiEndpoints.budget(categoryId));
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  Future<List<RecurringRule>> recurring() async {
+    try {
+      final response = await _api.dio.get(ApiEndpoints.recurring);
+      return (response.data as List)
+          .map((e) => RecurringRule.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  Future<RecurringRule> createRecurring({
+    required String title,
+    required double amount,
+    required TransactionType type,
+    required String categoryId,
+    required RecurrenceFrequency frequency,
+    required DateTime startDate,
+  }) async {
+    try {
+      final response = await _api.dio.post(
+        ApiEndpoints.recurring,
+        data: {
+          'title': title,
+          'amount': amount,
+          'type': type.apiValue,
+          'categoryId': categoryId,
+          'frequency': frequency.apiValue,
+          'startDate': startDate.toUtc().toIso8601String(),
+        },
+      );
+      return RecurringRule.fromJson(response.data as Map<String, dynamic>);
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  Future<RecurringRule> updateRecurring(
+    String id, {
+    String? title,
+    double? amount,
+    RecurrenceFrequency? frequency,
+    bool? active,
+  }) async {
+    try {
+      final response = await _api.dio.patch(
+        ApiEndpoints.recurringRule(id),
+        data: {
+          'title': ?title,
+          'amount': ?amount,
+          'frequency': ?frequency?.apiValue,
+          'active': ?active,
+        },
+      );
+      return RecurringRule.fromJson(response.data as Map<String, dynamic>);
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  Future<void> deleteRecurring(String id) async {
+    try {
+      await _api.dio.delete(ApiEndpoints.recurringRule(id));
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
   Future<List<Transaction>> transactions({TransactionType? type}) async {
     try {
       final response = await _api.dio.get(
@@ -69,6 +215,8 @@ class FinanceRepository {
     required TransactionType type,
     required String categoryId,
     required DateTime date,
+    String? paymentMethodId,
+    String? reference,
   }) async {
     try {
       final response = await _api.dio.post(
@@ -78,10 +226,97 @@ class FinanceRepository {
           'amount': amount,
           'type': type.apiValue,
           'categoryId': categoryId,
-          'date': date.toIso8601String(),
+          'date': date.toUtc().toIso8601String(),
+          'paymentMethodId': ?paymentMethodId,
+          'reference': ?reference,
         },
       );
       return Transaction.fromJson(response.data as Map<String, dynamic>);
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  Future<Transaction> updateTransaction(
+    String id, {
+    required String title,
+    required double amount,
+    required TransactionType type,
+    required String categoryId,
+    required DateTime date,
+    String? paymentMethodId,
+    String? reference,
+  }) async {
+    try {
+      final response = await _api.dio.patch(
+        ApiEndpoints.transaction(id),
+        data: {
+          'title': title,
+          'amount': amount,
+          'type': type.apiValue,
+          'categoryId': categoryId,
+          'date': date.toUtc().toIso8601String(),
+          // Sent even when null: the form shows them, so null clears them.
+          'paymentMethodId': paymentMethodId,
+          'reference': reference,
+        },
+      );
+      return Transaction.fromJson(response.data as Map<String, dynamic>);
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  Future<void> deleteTransaction(String id) async {
+    try {
+      await _api.dio.delete(ApiEndpoints.transaction(id));
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  Future<List<PaymentMethod>> paymentMethods() async {
+    try {
+      final response = await _api.dio.get(ApiEndpoints.paymentMethods);
+      return (response.data as List)
+          .map((e) => PaymentMethod.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  Future<PaymentMethod> createPaymentMethod(PaymentMethodInput input) async {
+    try {
+      final response = await _api.dio.post(
+        ApiEndpoints.paymentMethods,
+        data: input.toJson(),
+      );
+      return PaymentMethod.fromJson(response.data as Map<String, dynamic>);
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  Future<PaymentMethod> updatePaymentMethod(
+    String id,
+    PaymentMethodInput input,
+  ) async {
+    try {
+      final response = await _api.dio.patch(
+        ApiEndpoints.paymentMethod(id),
+        data: input.toJson(),
+      );
+      return PaymentMethod.fromJson(response.data as Map<String, dynamic>);
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  /// Its movements stay, without a payment method.
+  Future<void> deletePaymentMethod(String id) async {
+    try {
+      await _api.dio.delete(ApiEndpoints.paymentMethod(id));
     } catch (error) {
       throw _api.parseError(error);
     }
@@ -122,10 +357,47 @@ class FinanceRepository {
     }
   }
 
+  Future<SavingsGoal> updateGoal(
+    String id, {
+    required String name,
+    required double targetAmount,
+    required String icon,
+  }) async {
+    try {
+      final response = await _api.dio.patch(
+        ApiEndpoints.savingsGoal(id),
+        data: {'name': name, 'targetAmount': targetAmount, 'icon': icon},
+      );
+      return SavingsGoal.fromJson(response.data as Map<String, dynamic>);
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  Future<void> deleteGoal(String id) async {
+    try {
+      await _api.dio.delete(ApiEndpoints.savingsGoal(id));
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
   Future<SavingsGoal> addFunds(String goalId, double amount) async {
     try {
       final response = await _api.dio.post(
         ApiEndpoints.addGoalFunds(goalId),
+        data: {'amount': amount},
+      );
+      return SavingsGoal.fromJson(response.data as Map<String, dynamic>);
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  Future<SavingsGoal> withdrawFromGoal(String goalId, double amount) async {
+    try {
+      final response = await _api.dio.post(
+        ApiEndpoints.withdrawGoalFunds(goalId),
         data: {'amount': amount},
       );
       return SavingsGoal.fromJson(response.data as Map<String, dynamic>);

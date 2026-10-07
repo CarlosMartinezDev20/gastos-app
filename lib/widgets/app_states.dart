@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:shimmer/shimmer.dart';
 
+import 'mascot.dart';
+
 class AppErrorState extends StatelessWidget {
   const AppErrorState({
     super.key,
@@ -20,11 +22,7 @@ class AppErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.cloud_off_outlined,
-              size: 54,
-              color: Theme.of(context).colorScheme.primary,
-            ),
+            const Mascot(mood: MascotMood.worried, size: 96),
             const Gap(14),
             Text(
               'Algo no cargó bien',
@@ -58,11 +56,7 @@ class AppEmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.inbox_outlined,
-            size: 48,
-            color: Theme.of(context).colorScheme.primary,
-          ),
+          const Mascot(mood: MascotMood.sleepy, size: 84),
           const Gap(12),
           Text(title, style: Theme.of(context).textTheme.titleMedium),
           const Gap(4),

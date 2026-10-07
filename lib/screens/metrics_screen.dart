@@ -2,15 +2,35 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
+import 'package:intl/intl.dart';
 
-import '../core/constants/app_colors.dart';
+import '../core/utils/finance_insights.dart';
 import '../core/utils/formatters.dart';
+import '../core/utils/mascot_insights.dart';
 import '../models/metrics.dart';
 import '../providers/finance_providers.dart';
 import '../widgets/animated_progress.dart';
 import '../widgets/app_states.dart';
 import '../widgets/icon_mapper.dart';
-import '../widgets/soft_card.dart';
+import '../core/theme/app_palette.dart';
+import '../widgets/ios_ui.dart';
+import '../widgets/mascot.dart';
+import 'budgets_section.dart';
+import '../core/theme/motion.dart';
+
+// Paleta de colores para categorías (se rota cíclicamente)
+const _kCategoryColors = [
+  Color(0xFF67AD78),
+  Color(0xFF649DBD),
+  Color(0xFF9A86CF),
+  Color(0xFFC58F72),
+  Color(0xFFB87B98),
+  Color(0xFF6AADA2),
+  Color(0xFF8B91BD),
+  Color(0xFF96A36D),
+];
+
+Color _colorFor(int index) => _kCategoryColors[index % _kCategoryColors.length];
 
 class MetricsScreen extends ConsumerWidget {
   const MetricsScreen({super.key});
@@ -19,239 +39,53 @@ class MetricsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final expenses = ref.watch(categoryExpensesProvider);
     final efficiency = ref.watch(savingsEfficiencyProvider);
+    final budgets = ref.watch(budgetsProvider).value ?? const [];
 
-    return Scaffold(
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async {
-            ref.invalidate(categoryExpensesProvider);
-            ref.invalidate(savingsEfficiencyProvider);
-          },
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(24, 22, 24, 124),
-            children: [
-              const _MetricsHeader(),
-              const Gap(22),
-              efficiency.when(
-                loading: () => const _MetricsLoadingCard(height: 164),
-                error: (error, _) => AppErrorState(
-                  message: error.toString(),
-                  onRetry: () => ref.invalidate(savingsEfficiencyProvider),
-                ),
-                data: (data) => _EfficiencyCard(data: data),
-              ),
-              const Gap(18),
-              expenses.when(
-                loading: () => const _MetricsLoadingCard(height: 360),
-                error: (error, _) => AppErrorState(
-                  message: error.toString(),
-                  onRetry: () => ref.invalidate(categoryExpensesProvider),
-                ),
-                data: (items) => _CategoryExpensesCard(items: items),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MetricsHeader extends StatelessWidget {
-  const _MetricsHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Análisis Mensual',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w900,
-            height: 1,
-          ),
-        ),
-        const Gap(6),
-        Text(
-          'Ingresos, gastos y ahorro en una vista clara.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(
-              context,
-            ).colorScheme.onSurface.withValues(alpha: .64),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _EfficiencyCard extends StatelessWidget {
-  const _EfficiencyCard({required this.data});
-
-  final SavingsEfficiency data;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return SoftCard(
-      padding: const EdgeInsets.all(20),
-      color: isDark
-          ? AppColors.primary.withValues(alpha: .12)
-          : AppColors.blush.withValues(alpha: .72),
-      child: Row(
+    return RefreshIndicator(
+      onRefresh: () => Future.wait([
+        ref.refresh(categoryExpensesProvider.future),
+        ref.refresh(savingsEfficiencyProvider.future),
+        ref.refresh(transactionsProvider(null).future),
+        ref.refresh(budgetsProvider.future),
+      ]),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(20, 20, 20, dockClearance(context)),
         children: [
-          SizedBox(
-            width: 102,
-            height: 102,
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(
-                begin: 0,
-                end: (data.efficiencyPercent / 100).clamp(0, 1),
-              ),
-              duration: const Duration(milliseconds: 650),
-              curve: Curves.easeOutCubic,
-              builder: (context, value, _) => Stack(
-                alignment: Alignment.center,
-                children: [
-                  CircularProgressIndicator(
-                    value: value,
-                    strokeWidth: 11,
-                    strokeCap: StrokeCap.round,
-                    color: Theme.of(context).colorScheme.primary,
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: .12),
-                  ),
-                  Text(
-                    '${data.efficiencyPercent.toStringAsFixed(0)}%',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
+          LargeTitle(title: 'Análisis', subtitle: 'Cómo se reparte tu dinero'),
+          const SizedBox(height: 20),
+          const _FlowCard(),
+          const SizedBox(height: 24),
+          const BudgetsSection(),
+          const SizedBox(height: 24),
+          efficiency.when(
+            loading: () => const _MetricsLoadingCard(height: 180),
+            error: (error, _) => AppErrorState(
+              message: error.toString(),
+              onRetry: () => ref.invalidate(savingsEfficiencyProvider),
+            ),
+            data: (data) => _EfficiencyCard(data: data),
+          ),
+          const SizedBox(height: 24),
+          const SectionHeader(title: 'Gastos por categoría'),
+          const SizedBox(height: 8),
+          expenses.when(
+            loading: () => const _MetricsLoadingCard(height: 400),
+            error: (error, _) => AppErrorState(
+              message: error.toString(),
+              onRetry: () => ref.invalidate(categoryExpensesProvider),
+            ),
+            data: (items) => _CategoryExpensesCard(items: items),
+          ),
+          if (expenses.hasValue && efficiency.hasValue) ...[
+            const SizedBox(height: 20),
+            _AnalyzeButton(
+              tip: analysisTip(
+                expenses.requireValue,
+                efficiency.requireValue,
+                budgets: budgets,
               ),
             ),
-          ),
-          const Gap(18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Eficiencia de ahorro',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    height: 1,
-                  ),
-                ),
-                const Gap(8),
-                Text(
-                  data.message,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: .72),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Gap(12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _MetricPill(
-                      label: 'Ahorrado',
-                      value: Formatters.compactMoney(data.totalSaved),
-                    ),
-                    _MetricPill(
-                      label: 'Ingresos',
-                      value: Formatters.compactMoney(data.totalIncome),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MetricPill extends StatelessWidget {
-  const _MetricPill({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: .72),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        '$label · $value',
-        style: Theme.of(
-          context,
-        ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w900),
-      ),
-    );
-  }
-}
-
-class _CategoryExpensesCard extends StatelessWidget {
-  const _CategoryExpensesCard({required this.items});
-
-  final List<CategoryExpense> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return SoftCard(
-      padding: const EdgeInsets.all(20),
-      color: Theme.of(context).colorScheme.surface,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Gastos por categoría',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    height: 1,
-                  ),
-                ),
-              ),
-              if (items.isNotEmpty)
-                Text(
-                  '${items.length}',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-            ],
-          ),
-          const Gap(18),
-          if (items.isEmpty)
-            const AppEmptyState(
-              title: 'Sin gastos',
-              subtitle: 'Registra egresos para activar el análisis.',
-            )
-          else ...[
-            _MiniBarsChart(items: items),
-            const Gap(20),
-            for (final item in items)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: _CategoryExpenseRow(item: item),
-              ),
           ],
         ],
       ),
@@ -259,106 +93,469 @@ class _CategoryExpensesCard extends StatelessWidget {
   }
 }
 
-class _MiniBarsChart extends StatelessWidget {
-  const _MiniBarsChart({required this.items});
+// ───────────────────────────────────────── Cash-flow card
+class _FlowCard extends ConsumerStatefulWidget {
+  const _FlowCard();
 
-  final List<CategoryExpense> items;
+  @override
+  ConsumerState<_FlowCard> createState() => _FlowCardState();
+}
+
+class _FlowCardState extends ConsumerState<_FlowCard> {
+  FlowPeriod _period = FlowPeriod.week;
+
+  static const _labels = {
+    FlowPeriod.week: 'Semana',
+    FlowPeriod.month: 'Mes',
+    FlowPeriod.year: 'Año',
+  };
 
   @override
   Widget build(BuildContext context) {
-    final topItems = items.take(6).toList();
-    return SizedBox(
-      height: 112,
-      child: BarChart(
-        BarChartData(
-          alignment: BarChartAlignment.spaceAround,
-          gridData: const FlGridData(show: false),
-          borderData: FlBorderData(show: false),
-          titlesData: const FlTitlesData(show: false),
-          barTouchData: BarTouchData(enabled: false),
-          barGroups: topItems.asMap().entries.map((entry) {
-            final opacity = (1 - (entry.key * .08).clamp(0, .45)).toDouble();
-            return BarChartGroupData(
-              x: entry.key,
-              barRods: [
-                BarChartRodData(
-                  toY: entry.value.total,
-                  width: 16,
-                  borderRadius: BorderRadius.circular(999),
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: opacity),
-                ),
-              ],
-            );
-          }).toList(),
+    final transactions = ref.watch(transactionsProvider(null));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SegmentedTabs(
+          segments: _labels,
+          selected: _period,
+          onChanged: (p) => setState(() => _period = p),
         ),
+        const SizedBox(height: 16),
+        const SectionHeader(title: 'Flujo de dinero'),
+        const SizedBox(height: 8),
+        transactions.when(
+          loading: () => const _MetricsLoadingCard(height: 260),
+          error: (error, _) => AppErrorState(
+            message: error.toString(),
+            onRetry: () => ref.invalidate(transactionsProvider(null)),
+          ),
+          data: (items) => _FlowChart(
+            period: _period,
+            buckets: flowBuckets(items, DateTime.now(), _period),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FlowChart extends StatelessWidget {
+  const _FlowChart({required this.period, required this.buckets});
+
+  final FlowPeriod period;
+  final List<FlowBucket> buckets;
+
+  static const _weekdays = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+  static const _months = [
+    'E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D', //
+  ];
+
+  String _label(FlowBucket b) => switch (period) {
+    FlowPeriod.week => _weekdays[b.start.weekday - 1],
+    FlowPeriod.month => '${b.start.day}/${b.start.month}',
+    FlowPeriod.year => _months[b.start.month - 1],
+  };
+
+  String _tooltipTitle(FlowBucket b) => switch (period) {
+    FlowPeriod.week => Formatters.shortDate.format(b.start),
+    FlowPeriod.month => 'Semana del ${Formatters.shortDate.format(b.start)}',
+    FlowPeriod.year => DateFormat('MMMM yyyy', 'es').format(b.start),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final scheme = Theme.of(context).colorScheme;
+    final spent = buckets.fold(0.0, (sum, b) => sum + b.spent);
+    final maxY = buckets.fold(
+      0.0,
+      (m, b) => [m, b.income, b.spent].reduce((a, c) => a > c ? a : c),
+    );
+    final averageLabel = switch (period) {
+      FlowPeriod.week => 'Promedio diario',
+      FlowPeriod.month => 'Promedio semanal',
+      FlowPeriod.year => 'Promedio mensual',
+    };
+    Widget stat(String value, String label) => Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+          Text(label, style: TextStyle(color: palette.muted, fontSize: 13)),
+        ],
+      ),
+    );
+    Widget legend(Color color, String label) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(label, style: TextStyle(color: palette.muted, fontSize: 12)),
+      ],
+    );
+
+    return BentoCard(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              stat(Formatters.compactMoney(spent), 'Total gastado'),
+              const SizedBox(width: 12),
+              stat(
+                Formatters.compactMoney(spent / buckets.length),
+                averageLabel,
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 16,
+            children: [
+              legend(palette.chartIncome, 'Ingresos'),
+              legend(palette.chartExpense, 'Gastos'),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 170,
+            child: maxY == 0
+                ? Center(
+                    child: Text(
+                      'Sin movimientos en este periodo',
+                      style: TextStyle(color: palette.muted),
+                    ),
+                  )
+                : BarChart(
+                    duration: Motion.of(context, Motion.medium),
+                    BarChartData(
+                      alignment: BarChartAlignment.spaceAround,
+                      maxY: maxY == 0 ? 1 : maxY * 1.1,
+                      gridData: FlGridData(
+                        drawVerticalLine: false,
+                        horizontalInterval: maxY == 0 ? 1 : maxY / 3,
+                        getDrawingHorizontalLine: (_) => FlLine(
+                          color: scheme.onSurface.withValues(alpha: .06),
+                          strokeWidth: 1,
+                        ),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      titlesData: FlTitlesData(
+                        topTitles: const AxisTitles(),
+                        rightTitles: const AxisTitles(),
+                        leftTitles: const AxisTitles(),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 26,
+                            getTitlesWidget: (value, meta) {
+                              final i = value.toInt();
+                              if (i < 0 || i >= buckets.length) {
+                                return const SizedBox.shrink();
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Text(
+                                  _label(buckets[i]),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: i == buckets.length - 1
+                                        ? scheme.onSurface
+                                        : palette.muted,
+                                    fontWeight: i == buckets.length - 1
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      barTouchData: BarTouchData(
+                        touchTooltipData: BarTouchTooltipData(
+                          getTooltipColor: (_) => palette.pill,
+                          fitInsideHorizontally: true,
+                          fitInsideVertically: true,
+                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                            if (rodIndex != 0) return null;
+                            final b = buckets[groupIndex];
+                            final style = TextStyle(
+                              color: palette.onPill,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            );
+                            return BarTooltipItem(
+                              '${_tooltipTitle(b)}\n',
+                              style.copyWith(fontWeight: FontWeight.w700),
+                              children: [
+                                TextSpan(
+                                  text:
+                                      'Ingresos ${Formatters.compactMoney(b.income)}\n'
+                                      'Gastos ${Formatters.compactMoney(b.spent)}',
+                                  style: style,
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                      barGroups: [
+                        for (var i = 0; i < buckets.length; i++)
+                          BarChartGroupData(
+                            x: i,
+                            barsSpace: 2,
+                            barRods: [
+                              for (final (value, color) in [
+                                (buckets[i].income, palette.chartIncome),
+                                (buckets[i].spent, palette.chartExpense),
+                              ])
+                                BarChartRodData(
+                                  toY: value,
+                                  color: color,
+                                  width: period == FlowPeriod.year ? 7 : 12,
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(4),
+                                  ),
+                                ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _CategoryExpenseRow extends StatelessWidget {
-  const _CategoryExpenseRow({required this.item});
+// ───────────────────────────────────────── Mascot analysis
+class _AnalyzeButton extends StatelessWidget {
+  const _AnalyzeButton({required this.tip});
 
-  final CategoryExpense item;
+  final MascotTip tip;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 20,
-          backgroundColor: Theme.of(
-            context,
-          ).colorScheme.primary.withValues(alpha: .12),
-          child: Icon(
-            iconFromApi(item.icon),
-            size: 20,
-            color: Theme.of(context).colorScheme.primary,
+    return FilledButton.icon(
+      style: FilledButton.styleFrom(shape: const StadiumBorder()),
+      onPressed: () => showModalBottomSheet<void>(
+        sheetAnimationStyle: Motion.sheet,
+        context: context,
+        useRootNavigator: true,
+        useSafeArea: true,
+        builder: (_) => _AnalysisSheet(tip: tip),
+      ),
+      icon: const Icon(Icons.auto_awesome),
+      label: const Text('Analizar con $mascotName'),
+    );
+  }
+}
+
+class _AnalysisSheet extends StatelessWidget {
+  const _AnalysisSheet({required this.tip});
+
+  final MascotTip tip;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Mascot(mood: tip.mood, size: 130, onTap: () {}),
           ),
-        ),
-        const Gap(12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      item.categoryName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w900),
+          const SizedBox(height: 8),
+          Text(
+            '$mascotName analizó tus finanzas',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 16),
+          for (final (i, message) in tip.messages.indexed) ...[
+            FadeSlideIn(
+              index: i + 1,
+              child: BentoCard(
+                color: [
+                  palette.mint,
+                  palette.lilac,
+                  palette.ink,
+                  palette.blush,
+                ][i % 4],
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.auto_awesome,
+                      size: 18,
+                      color: [
+                        palette.onMint,
+                        palette.onLilac,
+                        palette.onInk,
+                        palette.onBlush,
+                      ][i % 4],
                     ),
-                  ),
-                  Text(
-                    Formatters.compactMoney(item.total),
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        message,
+                        style: TextStyle(
+                          height: 1.35,
+                          fontWeight: FontWeight.w500,
+                          color: [
+                            palette.onMint,
+                            palette.onLilac,
+                            palette.onInk,
+                            palette.onBlush,
+                          ][i % 4],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const Gap(8),
-              AnimatedProgressBar(
-                value: item.percentage / 100,
-                height: 7,
-                color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 10),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ───────────────────────────────────────── Efficiency card
+class _EfficiencyCard extends StatelessWidget {
+  const _EfficiencyCard({required this.data});
+
+  final SavingsEfficiency data;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final effVal = (data.efficiencyPercent / 100).clamp(0, 1).toDouble();
+
+    return BentoCard(
+      color: palette.ink,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PillTag(label: 'Eficiencia de ahorro', color: palette.onInk),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              SizedBox(
+                width: 112,
+                height: 112,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: effVal),
+                  duration: Motion.of(context, Motion.emphasis),
+                  curve: Motion.standard,
+                  builder: (context, value, _) => Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Positioned.fill(
+                        child: CircularProgressIndicator(
+                          value: value,
+                          strokeWidth: 12,
+                          strokeCap: StrokeCap.round,
+                          color: palette.accent,
+                          backgroundColor: palette.onInk.withValues(alpha: .14),
+                        ),
+                      ),
+                      Text(
+                        '${data.efficiencyPercent.toStringAsFixed(0)}%',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(color: palette.onInk),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      data.message,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: palette.onInk,
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _EfficiencyStat(
+                      label: 'Ingresos',
+                      value: Formatters.compactMoney(data.totalIncome),
+                    ),
+                    const SizedBox(height: 8),
+                    _EfficiencyStat(
+                      label: 'Ahorrado',
+                      value: Formatters.compactMoney(data.totalSaved),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
-        ),
-        const Gap(10),
-        SizedBox(
-          width: 42,
+        ],
+      ),
+    );
+  }
+}
+
+class _EfficiencyStat extends StatelessWidget {
+  const _EfficiencyStat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Row(
+      children: [
+        Expanded(
           child: Text(
-            '${item.percentage.toStringAsFixed(0)}%',
-            textAlign: TextAlign.right,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: .62),
-              fontWeight: FontWeight.w900,
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: palette.inkMuted),
+          ),
+        ),
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerRight,
+            child: Text(
+              value,
+              style: TextStyle(
+                color: palette.onInk,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),
@@ -367,6 +564,357 @@ class _CategoryExpenseRow extends StatelessWidget {
   }
 }
 
+// ───────────────────────────────────────── Category expenses card
+class _CategoryExpensesCard extends StatelessWidget {
+  const _CategoryExpensesCard({required this.items});
+
+  final List<CategoryExpense> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final palette = context.palette;
+    final totalGasto = items.fold(0.0, (sum, e) => sum + e.total);
+
+    return BentoCard(
+      border: false,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'TOTAL GASTADO',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: scheme.onSurface.withValues(alpha: .52),
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: .8,
+                      ),
+                    ),
+                    const Gap(2),
+                    Text(
+                      items.isEmpty ? '—' : Formatters.compactMoney(totalGasto),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w600, height: 1),
+                    ),
+                  ],
+                ),
+              ),
+              if (items.isNotEmpty)
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: palette.mint,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '${items.length} ${items.length == 1 ? 'categoría' : 'categorías'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: palette.onMint,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const Gap(20),
+          if (items.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: AppEmptyState(
+                title: 'Sin gastos registrados',
+                subtitle:
+                    'Registra egresos para activar el análisis por categoría.',
+              ),
+            )
+          else ...[
+            _BarsChart(items: items),
+            const Gap(24),
+            // Divider sutil antes de la lista
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: scheme.onSurface.withValues(alpha: .07),
+            ),
+            const Gap(16),
+            // Lista de filas
+            for (int i = 0; i < items.length; i++) ...[
+              _CategoryExpenseRow(
+                item: items[i],
+                index: i,
+                color: _colorFor(i),
+              ),
+              if (i < items.length - 1)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: scheme.onSurface.withValues(alpha: .055),
+                  ),
+                )
+              else
+                const Gap(4),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ───────────────────────────────────────── Bar chart
+class _BarsChart extends StatelessWidget {
+  const _BarsChart({required this.items});
+
+  final List<CategoryExpense> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final topItems = items.take(6).toList();
+    final scheme = Theme.of(context).colorScheme;
+
+    return SizedBox(
+      height: 148,
+      child: Column(
+        children: [
+          Expanded(
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY:
+                    topItems.fold(0.0, (m, e) => e.total > m ? e.total : m) *
+                    1.22,
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: topItems.isEmpty
+                      ? 1
+                      : topItems.fold(
+                              0.0,
+                              (m, e) => e.total > m ? e.total : m,
+                            ) /
+                            3,
+                  getDrawingHorizontalLine: (value) => FlLine(
+                    color: scheme.onSurface.withValues(alpha: .06),
+                    strokeWidth: 1,
+                    dashArray: [4, 6],
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                titlesData: FlTitlesData(
+                  show: true,
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 32,
+                      getTitlesWidget: (value, meta) {
+                        final idx = value.toInt();
+                        if (idx < 0 || idx >= topItems.length) {
+                          return const SizedBox.shrink();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Icon(
+                            iconFromApi(topItems[idx].icon),
+                            size: 16,
+                            color: _colorFor(idx),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipColor: (_) => scheme.surfaceContainerHighest,
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      final item = topItems[groupIndex];
+                      return BarTooltipItem(
+                        '${item.categoryName}\n',
+                        TextStyle(
+                          color: scheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: Formatters.compactMoney(item.total),
+                            style: TextStyle(
+                              color: _colorFor(groupIndex),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                barGroups: topItems.asMap().entries.map((entry) {
+                  final color = _colorFor(entry.key);
+                  return BarChartGroupData(
+                    x: entry.key,
+                    barRods: [
+                      BarChartRodData(
+                        toY: entry.value.total,
+                        width: 20,
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(8),
+                          bottom: Radius.circular(4),
+                        ),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [color, color.withValues(alpha: .55)],
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ───────────────────────────────────────── Category row
+class _CategoryExpenseRow extends StatelessWidget {
+  const _CategoryExpenseRow({
+    required this.item,
+    required this.index,
+    required this.color,
+  });
+
+  final CategoryExpense item;
+  final int index;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return FadeSlideIn(
+      index: index,
+      child: Row(
+        children: [
+          // Número de ranking
+          SizedBox(
+            width: 22,
+            child: Text(
+              '${index + 1}',
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: scheme.onSurface.withValues(alpha: .32),
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const Gap(10),
+          // Icono con color de la categoría
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: .12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(iconFromApi(item.icon), size: 20, color: color),
+          ),
+          const Gap(12),
+          // Nombre + barra de progreso
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.categoryName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    const Gap(8),
+                    // Shrinks instead of being cut: a truncated amount
+                    // would be misleading.
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          Formatters.compactMoney(item.total),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: color,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const Gap(7),
+                AnimatedProgressBar(
+                  value: item.percentage / 100,
+                  height: 6,
+                  color: color,
+                ),
+              ],
+            ),
+          ),
+          const Gap(10),
+          // Porcentaje
+          SizedBox(
+            width: 40,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(
+                '${item.percentage.toStringAsFixed(0)}%',
+                textAlign: TextAlign.right,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: scheme.onSurface.withValues(alpha: .55),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ───────────────────────────────────────── Loading skeleton
 class _MetricsLoadingCard extends StatelessWidget {
   const _MetricsLoadingCard({required this.height});
 
@@ -374,7 +922,8 @@ class _MetricsLoadingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SoftCard(
+    return BentoCard(
+      border: false,
       child: SizedBox(
         height: height,
         child: Center(

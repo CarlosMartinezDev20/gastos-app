@@ -9,6 +9,12 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(ref.watch(apiClientProvider));
 });
 
+/// Id of the signed-in user. Data providers watch it so cached data from a
+/// previous session is discarded on logout or when another account signs in.
+final currentUserIdProvider = Provider<String?>((ref) {
+  return ref.watch(authControllerProvider.select((auth) => auth.value?.id));
+});
+
 final authControllerProvider =
     NotifierProvider<AuthController, AsyncValue<UserProfile?>>(
       AuthController.new,
@@ -19,6 +25,9 @@ class AuthController extends Notifier<AsyncValue<UserProfile?>> {
 
   @override
   AsyncValue<UserProfile?> build() {
+    ref.read(apiClientProvider).onUnauthorized = () {
+      if (state.value != null) state = const AsyncData(null);
+    };
     Future.microtask(load);
     return const AsyncLoading();
   }
@@ -72,6 +81,11 @@ class AuthController extends Notifier<AsyncValue<UserProfile?>> {
       state = AsyncError(error, stackTrace);
       rethrow;
     }
+  }
+
+  Future<void> updateName(String name) async {
+    final user = await _repo.updateProfile(name: name);
+    state = AsyncData(user);
   }
 
   Future<void> logout() async {
