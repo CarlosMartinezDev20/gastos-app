@@ -4,8 +4,8 @@ import '../../models/recurring.dart';
 import 'formatters.dart';
 import 'wallet.dart';
 
-/// A service people subscribe to. No logos (trademarks): an app-icon-like
-/// tile with the service's colors and a monogram.
+/// A service people subscribe to, drawn as an app-icon-like tile with its
+/// colors and its mark (`brandMarks`) or, without one, a monogram.
 class SubscriptionService {
   const SubscriptionService(
     this.key,
@@ -59,6 +59,10 @@ const subscriptionCatalog = <SubscriptionService>[
     'P',
     [Color(0xFF2A9AA6), Color(0xFF13545C)],
   ),
+  SubscriptionService('cursor', 'Cursor', 'Inteligencia artificial', 'Cu', [
+    Color(0xFF3A3A3C),
+    Color(0xFF0A0A0A),
+  ]),
   SubscriptionService('spotify', 'Spotify', 'Música', 'S', [
     Color(0xFF1ED760),
     Color(0xFF128A3E),
@@ -71,6 +75,10 @@ const subscriptionCatalog = <SubscriptionService>[
     Color(0xFFFF3B4F),
     Color(0xFFC4001D),
   ]),
+  SubscriptionService('deezer', 'Deezer', 'Música', 'Dz', [
+    Color(0xFFB45CFF),
+    Color(0xFF7A1FD1),
+  ]),
   SubscriptionService('netflix', 'Netflix', 'Video', 'N', [
     Color(0xFFE50914),
     Color(0xFF7A050B),
@@ -79,9 +87,21 @@ const subscriptionCatalog = <SubscriptionService>[
     Color(0xFF1F4FE0),
     Color(0xFF0B2580),
   ]),
-  SubscriptionService('max', 'Max', 'Video', 'MAX', [
-    Color(0xFF2C55F2),
-    Color(0xFF00168C),
+  SubscriptionService('max', 'HBO Max', 'Video', 'MAX', [
+    Color(0xFF5B3CF5),
+    Color(0xFF1B0C7A),
+  ]),
+  SubscriptionService('crunchyroll', 'Crunchyroll', 'Video', 'CR', [
+    Color(0xFFFF8A3D),
+    Color(0xFFE85000),
+  ]),
+  SubscriptionService('paramountplus', 'Paramount+', 'Video', 'P+', [
+    Color(0xFF3D86FF),
+    Color(0xFF0050D6),
+  ]),
+  SubscriptionService('appletv', 'Apple TV+', 'Video', 'tv', [
+    Color(0xFF3A3A3C),
+    Color(0xFF111111),
   ]),
   SubscriptionService('prime', 'Prime Video', 'Video', 'P', [
     Color(0xFF1FB6EA),
@@ -95,9 +115,17 @@ const subscriptionCatalog = <SubscriptionService>[
     Color(0xFF4CC26E),
     Color(0xFF1E7E3A),
   ]),
+  SubscriptionService('dropbox', 'Dropbox', 'Nube', 'Db', [
+    Color(0xFF3D8BFF),
+    Color(0xFF0050D9),
+  ]),
   SubscriptionService('xbox', 'Xbox Game Pass', 'Juegos', 'X', [
     Color(0xFF2EA043),
     Color(0xFF0B5A0B),
+  ]),
+  SubscriptionService('discord', 'Discord Nitro', 'Juegos', 'D', [
+    Color(0xFF7983F5),
+    Color(0xFF4752C4),
   ]),
   SubscriptionService(
     'playstation',
@@ -122,6 +150,10 @@ const subscriptionCatalog = <SubscriptionService>[
   SubscriptionService('notion', 'Notion', 'Productividad', 'N', [
     Color(0xFF4A4A4A),
     Color(0xFF111111),
+  ]),
+  SubscriptionService('figma', 'Figma', 'Productividad', 'F', [
+    Color(0xFFFF7262),
+    Color(0xFFD93A12),
   ]),
   SubscriptionService(
     'microsoft365',

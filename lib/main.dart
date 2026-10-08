@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'core/licenses.dart';
 import 'core/theme/app_theme.dart';
 import 'navigation/app_router.dart';
 import 'providers/payment_reminders_provider.dart';
@@ -13,6 +14,7 @@ import 'widgets/theme_crossfade.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  registerBundledLicenses();
   await initializeDateFormatting('es');
   final prefs = await SharedPreferences.getInstance();
   runApp(

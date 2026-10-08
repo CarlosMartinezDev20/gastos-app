@@ -1,4 +1,6 @@
+import 'package:appgastos/core/utils/brand_marks.dart';
 import 'package:appgastos/core/utils/subscriptions.dart';
+import 'package:appgastos/widgets/service_logo.dart';
 import 'package:appgastos/models/category.dart';
 import 'package:appgastos/models/recurring.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -75,5 +77,17 @@ void main() {
     expect(chargeLabel(DateTime(2026, 10, 8, 12), now: now), 'Mañana');
     expect(chargeLabel(DateTime(2026, 10, 12, 12), now: now), 'En 5 días');
     expect(chargeLabel(DateTime(2026, 11, 20, 12), now: now), '20 nov');
+  });
+
+  test('every brand mark belongs to a catalog service and parses', () {
+    for (final key in brandMarks.keys) {
+      expect(serviceFor(key), isNotNull, reason: key);
+      final bounds = ServiceLogo.markFor(key)!.getBounds();
+      // About the 24×24 box (bounds include curve control points).
+      expect(bounds.width, greaterThan(10), reason: key);
+      expect(bounds.left, greaterThanOrEqualTo(-1), reason: key);
+      expect(bounds.right, lessThanOrEqualTo(25), reason: key);
+    }
+    expect(ServiceLogo.markFor('chatgpt'), isNull, reason: 'monogram');
   });
 }
