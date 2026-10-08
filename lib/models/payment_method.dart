@@ -52,6 +52,7 @@ class PaymentMethod {
     this.dueDay,
     this.transactionCount = 0,
     this.paidTotal = 0,
+    this.chargedTotal = 0,
   });
 
   final String id;
@@ -75,6 +76,10 @@ class PaymentMethod {
   /// Credit cards: everything paid to the card so far.
   final double paidTotal;
 
+  /// What was charged to it, all time: purchases − refunds (from the API,
+  /// since the app only loads recent movements).
+  final double chargedTotal;
+
   /// "•••• 4821", or null without digits.
   String? get masked => last4 == null ? null : '•••• $last4';
 
@@ -94,6 +99,7 @@ class PaymentMethod {
     dueDay: json['dueDay'] as int?,
     transactionCount: json['transactionCount'] as int? ?? 0,
     paidTotal: (json['paidTotal'] as num?)?.toDouble() ?? 0,
+    chargedTotal: (json['chargedTotal'] as num?)?.toDouble() ?? 0,
   );
 }
 

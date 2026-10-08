@@ -7,9 +7,15 @@ import '../models/metrics.dart';
 import '../models/recurring.dart';
 import '../models/savings_goal.dart';
 import '../models/transaction.dart';
+import '../models/transaction_page.dart';
 import '../models/user_profile.dart';
 import '../models/payment_method.dart';
 import 'auth_repository.dart';
+
+/// Where the movements the app keeps in memory start: this month and the
+/// twelve before it, enough for every chart, average and statement.
+/// Historial pages through the rest.
+DateTime recentWindowStart(DateTime now) => DateTime(now.year - 1, now.month);
 
 class FinanceRepository {
   const FinanceRepository(this._api, this._auth);
@@ -22,7 +28,7 @@ class FinanceRepository {
       _auth.profile(),
       balance(),
       savingsGoals(),
-      transactions(),
+      transactions(from: recentWindowStart(DateTime.now())),
     ]);
     return DashboardData(
       user: results[0] as UserProfile,
@@ -194,15 +200,47 @@ class FinanceRepository {
     }
   }
 
-  Future<List<Transaction>> transactions({TransactionType? type}) async {
+  /// Movements newest first; [from]/[to] are instants. Without [from] it
+  /// brings all of them, so screens pass [recentWindowStart].
+  Future<List<Transaction>> transactions({
+    TransactionType? type,
+    DateTime? from,
+    DateTime? to,
+  }) async {
     try {
       final response = await _api.dio.get(
         ApiEndpoints.transactions,
-        queryParameters: {if (type != null) 'type': type.apiValue},
+        queryParameters: {
+          if (type != null) 'type': type.apiValue,
+          if (from != null) 'from': from.toUtc().toIso8601String(),
+          if (to != null) 'to': to.toUtc().toIso8601String(),
+        },
       );
       return (response.data as List)
           .map((e) => Transaction.fromJson(e as Map<String, dynamic>))
           .toList();
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  /// One page of Historial; pass the previous page's `nextCursor` for the
+  /// next one.
+  Future<TransactionPage> transactionPage(
+    HistoryQuery query, {
+    String? cursor,
+    int limit = 50,
+  }) async {
+    try {
+      final response = await _api.dio.get(
+        ApiEndpoints.transactionPage,
+        queryParameters: {
+          ...query.apiParams,
+          'limit': limit,
+          'cursor': ?cursor,
+        },
+      );
+      return TransactionPage.fromJson(response.data as Map<String, dynamic>);
     } catch (error) {
       throw _api.parseError(error);
     }

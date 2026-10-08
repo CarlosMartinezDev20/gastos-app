@@ -8,6 +8,7 @@ class ApiEndpoints {
   static const categories = '/categories';
   static const transactions = '/transactions';
   static const balance = '/transactions/balance';
+  static const transactionPage = '/transactions/page';
   static const savingsGoals = '/savings-goals';
   static const categoryExpenses = '/metrics/category-expenses';
   static const savingsEfficiency = '/metrics/savings-efficiency';

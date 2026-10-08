@@ -12,6 +12,8 @@ import 'package:appgastos/models/payment_method.dart';
 import 'package:appgastos/models/recurring.dart';
 import 'package:appgastos/models/savings_goal.dart';
 import 'package:appgastos/models/transaction.dart';
+import 'package:appgastos/models/transaction_page.dart';
+import 'package:appgastos/core/utils/transaction_filter.dart';
 import 'package:appgastos/models/user_profile.dart';
 import 'package:appgastos/repositories/auth_repository.dart';
 import 'package:appgastos/repositories/finance_repository.dart';
@@ -435,9 +437,53 @@ class FakeFinanceRepository implements FinanceRepository {
   }
 
   @override
-  Future<List<Transaction>> transactions({TransactionType? type}) async =>
-      backend.transactions.where((t) => type == null || t.type == type).toList()
+  Future<List<Transaction>> transactions({
+    TransactionType? type,
+    DateTime? from,
+    DateTime? to,
+  }) async =>
+      backend.transactions
+          .where(
+            (t) =>
+                (type == null || t.type == type) &&
+                (from == null || !t.date.isBefore(from)) &&
+                (to == null || !t.date.isAfter(to)),
+          )
+          .toList()
         ..sort((a, b) => b.date.compareTo(a.date));
+
+  /// Pages by position (the cursor is the next index), filtered like the
+  /// API with the app's own [filterTransactions].
+  @override
+  Future<TransactionPage> transactionPage(
+    HistoryQuery query, {
+    String? cursor,
+    int limit = 50,
+  }) async {
+    backend.calls.add('page${cursor == null ? '' : ':$cursor'}');
+    final all = filterTransactions(
+      backend.transactions,
+      query: query.search,
+      type: query.type,
+      from: query.from,
+      to: query.to,
+    );
+    final start = int.parse(cursor ?? '0');
+    final end = (start + limit).clamp(0, all.length);
+    double sum(TransactionType type) =>
+        all.where((t) => t.type == type).fold(0.0, (s, t) => s + t.amount);
+    return TransactionPage(
+      items: all.sublist(start, end),
+      nextCursor: end < all.length ? '$end' : null,
+      summary: cursor == null
+          ? HistorySummary(
+              count: all.length,
+              income: sum(TransactionType.income),
+              expense: sum(TransactionType.expense),
+            )
+          : null,
+    );
+  }
 
   @override
   Future<BalanceSummary> balance() async {
@@ -529,6 +575,14 @@ class FakeFinanceRepository implements FinanceRepository {
         paidTotal: backend.cardPayments
             .where((p) => p.paymentMethodId == m.id)
             .fold(0.0, (sum, p) => sum + p.amount),
+        chargedTotal: backend.transactions
+            .where((t) => t.paymentMethodId == m.id)
+            .fold(
+              0.0,
+              (sum, t) =>
+                  sum +
+                  (t.type == TransactionType.expense ? t.amount : -t.amount),
+            ),
       ),
   ];
 

@@ -607,6 +607,51 @@ void main() {
     expect(find.text('Comenzar'), findsOneWidget);
   });
 
+  testWidgets('Historial loads a page at a time with totals of all', (
+    tester,
+  ) async {
+    final backend = await pumpApp(tester);
+    final start = DateTime(2025, 1, 1, 12);
+    backend.transactions.addAll([
+      for (var i = 0; i < 70; i++)
+        Transaction(
+          id: 'bulk$i',
+          title: i == 7 ? 'Café de examen' : 'Fotocopia $i',
+          amount: 1,
+          type: TransactionType.expense,
+          date: start.subtract(Duration(days: i)),
+          category: food,
+        ),
+    ]);
+    final total = backend.transactions.length;
+    await goToTab(tester, 'Historial');
+
+    // The totals count everything; the list holds the first page.
+    expect(find.textContaining('$total movimientos'), findsOneWidget);
+    expect(backend.calls, isNot(contains('page:50')));
+
+    // Nearing the end loads the next page on its own.
+    await tester.scrollUntilVisible(
+      find.text('Fotocopia 69'),
+      600,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(backend.calls, contains('page:50'));
+    expect(find.textContaining('Ver más'), findsNothing);
+
+    // The search waits for a pause in typing, then asks the API.
+    final pages = backend.calls.where((c) => c == 'page').length;
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 20000));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(CupertinoSearchTextField), 'caf');
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.enterText(find.byType(CupertinoSearchTextField), 'cafe');
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+    expect(backend.calls.where((c) => c == 'page').length, pages + 1);
+    expect(find.text('Café de examen'), findsOneWidget);
+    expect(find.textContaining('1 movimiento '), findsOneWidget);
+  });
+
   testWidgets('changes the password', (tester) async {
     final backend = await pumpApp(tester);
     await openProfile(tester);

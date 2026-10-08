@@ -22,6 +22,8 @@ const visa = PaymentMethod(
   creditLimit: 500,
   statementDay: 15,
   dueDay: 5,
+  // Every purchase (99 + 120 + 30) minus the refund (10), as the API sums it.
+  chargedTotal: 239,
 );
 
 const cash = PaymentMethod(
@@ -101,7 +103,6 @@ void main() {
     ], now);
     expect(summary.spent, 150);
     expect(summary.movements.map((t) => t.id), ['refund', 'b', 'a']);
-    // Owed: every purchase (99 + 120 + 30) minus the refund (10).
     expect(summary.debt, 239);
     expect(summary.available, 261);
     expect(summary.utilization, closeTo(.478, 1e-9));
@@ -162,6 +163,7 @@ void main() {
       color: 'ink',
       creditLimit: 500,
       paidTotal: 300,
+      chargedTotal: 250,
     );
     final summary = summarizeMethod(paid, [
       tx('a', DateTime(2026, 10, 1), 200, method: 'visa'),
@@ -172,5 +174,20 @@ void main() {
     expect(summary.available, 550);
     expect(summary.utilization, 0);
     expect(summary.lastStatementSpent, isNull);
+  });
+
+  test('the debt counts purchases older than the loaded movements', () {
+    const old = PaymentMethod(
+      id: 'visa',
+      name: 'Visa',
+      kind: PaymentMethodKind.creditCard,
+      color: 'ink',
+      creditLimit: 500,
+      chargedTotal: 400.1,
+      paidTotal: 100,
+    );
+    final summary = summarizeMethod(old, const [], DateTime(2026, 10, 6));
+    expect(summary.spent, 0);
+    expect(summary.debt, 300.1);
   });
 }

@@ -23,6 +23,8 @@ PaymentMethod card({double paid = 0, int? dueDay = 10}) => PaymentMethod(
   last4: '4821',
   dueDay: dueDay,
   paidTotal: paid,
+  // The purchase below, as the API's all-time total.
+  chargedTotal: 120,
 );
 
 final purchase = Transaction(

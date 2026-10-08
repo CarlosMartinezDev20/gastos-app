@@ -125,16 +125,11 @@ WalletSummary summarizeMethod(
   }).toList()..sort((a, b) => b.date.compareTo(a.date));
   final spent = _expensesIn(transactions, method.id, period);
   final credit = method.kind.isCredit;
-  double? debt;
-  if (credit) {
-    var owed = -method.paidTotal;
-    for (final t in transactions) {
-      if (t.paymentMethodId != method.id) continue;
-      owed += t.type == TransactionType.expense ? t.amount : -t.amount;
-    }
-    // Cents from summing doubles shouldn't show as a debt.
-    debt = (owed * 100).roundToDouble() / 100;
-  }
+  // All-time totals from the API: [transactions] are only the recent ones.
+  // Rounded so cents from subtracting doubles don't show as a debt.
+  final debt = credit
+      ? ((method.chargedTotal - method.paidTotal) * 100).roundToDouble() / 100
+      : null;
   return WalletSummary(
     method: method,
     period: period,

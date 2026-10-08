@@ -13,6 +13,7 @@ import '../models/transaction.dart';
 import '../models/payment_method.dart';
 import '../repositories/finance_repository.dart';
 import 'auth_provider.dart';
+import 'history_provider.dart';
 import 'storage_provider.dart';
 
 final financeRepositoryProvider = Provider<FinanceRepository>((ref) {
@@ -32,10 +33,15 @@ final categoriesProvider = FutureProvider<List<Category>>((ref) {
   return ref.watch(financeRepositoryProvider).categories();
 });
 
+/// The recent movements (see [recentWindowStart]) that charts, the wallet,
+/// Michi and the forms work from. Historial pages through all of them with
+/// [historyProvider].
 final transactionsProvider =
     FutureProvider.family<List<Transaction>, TransactionType?>((ref, type) {
       ref.watch(currentUserIdProvider);
-      return ref.watch(financeRepositoryProvider).transactions(type: type);
+      return ref
+          .watch(financeRepositoryProvider)
+          .transactions(type: type, from: recentWindowStart(DateTime.now()));
     });
 
 final savingsGoalsProvider = FutureProvider<List<SavingsGoal>>((ref) {
@@ -108,6 +114,7 @@ void _refreshAll(void Function(ProviderOrFamily provider) invalidate) {
   invalidate(dashboardProvider);
   invalidate(categoriesProvider);
   invalidate(transactionsProvider);
+  invalidate(historyProvider);
   invalidate(savingsGoalsProvider);
   invalidate(categoryExpensesProvider);
   invalidate(savingsEfficiencyProvider);
