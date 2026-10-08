@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
 
@@ -58,6 +59,13 @@ class MetricsScreen extends ConsumerWidget {
             LargeTitle(
               title: 'Análisis',
               subtitle: 'Cómo se reparte tu dinero',
+              trailing: [
+                CircleButton(
+                  icon: CupertinoIcons.tag,
+                  tooltip: 'Categorías',
+                  onPressed: () => context.push('/categories'),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             const _FlowCard(),

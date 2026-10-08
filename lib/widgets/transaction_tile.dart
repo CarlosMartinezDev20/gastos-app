@@ -117,6 +117,53 @@ class TransactionTile extends StatelessWidget {
   }
 }
 
+/// Deletes at once and offers to undo, instead of asking first: faster,
+/// and a mistaken tap or swipe costs nothing. False if it failed (the error
+/// is shown).
+Future<bool> deleteTransactionWithUndo(
+  BuildContext context,
+  WidgetRef ref,
+  Transaction tx,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+  // The undo outlives the widget that started it: keep what it needs.
+  final service = ref.read(transactionServiceProvider);
+  final container = ProviderScope.containerOf(context);
+  try {
+    await service.delete(tx.id);
+  } catch (error) {
+    messenger.showSnackBar(SnackBar(content: Text(error.toString())));
+    return false;
+  }
+  refreshFinanceIn(container);
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text('"${tx.title}" eliminado'),
+      duration: const Duration(seconds: 5),
+      action: SnackBarAction(
+        label: 'Deshacer',
+        onPressed: () async {
+          try {
+            await service.create(
+              title: tx.title,
+              amount: tx.amount,
+              type: tx.type,
+              categoryId: tx.category.id,
+              date: tx.date,
+              paymentMethodId: tx.paymentMethodId,
+              reference: tx.reference,
+            );
+            refreshFinanceIn(container);
+          } catch (error) {
+            messenger.showSnackBar(SnackBar(content: Text(error.toString())));
+          }
+        },
+      ),
+    ),
+  );
+  return true;
+}
+
 String _signedAmount(Transaction transaction) {
   final positive =
       transaction.type == TransactionType.income ||
@@ -146,51 +193,13 @@ class _TransactionDetailState extends ConsumerState<_TransactionDetail> {
     showNewTransactionSheet(parent, transaction: _tx);
   }
 
-  /// Deletes at once and offers to undo, instead of asking first: faster,
-  /// and a mistaken tap costs nothing.
   Future<void> _delete() async {
     setState(() => _deleting = true);
-    final messenger = ScaffoldMessenger.of(context);
-    // The sheet closes before an undo: keep what it needs.
-    final service = ref.read(transactionServiceProvider);
-    final container = ProviderScope.containerOf(context);
-    final tx = _tx;
-    try {
-      await service.delete(tx.id);
-      refreshFinance(ref);
-      if (!mounted) return;
-      Navigator.pop(context);
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('"${tx.title}" eliminado'),
-          duration: const Duration(seconds: 5),
-          action: SnackBarAction(
-            label: 'Deshacer',
-            onPressed: () async {
-              try {
-                await service.create(
-                  title: tx.title,
-                  amount: tx.amount,
-                  type: tx.type,
-                  categoryId: tx.category.id,
-                  date: tx.date,
-                  paymentMethodId: tx.paymentMethodId,
-                  reference: tx.reference,
-                );
-                refreshFinanceIn(container);
-              } catch (error) {
-                messenger.showSnackBar(
-                  SnackBar(content: Text(error.toString())),
-                );
-              }
-            },
-          ),
-        ),
-      );
-    } catch (error) {
-      if (!mounted) return;
+    final navigator = Navigator.of(context);
+    if (await deleteTransactionWithUndo(context, ref, _tx)) {
+      navigator.pop();
+    } else if (mounted) {
       setState(() => _deleting = false);
-      messenger.showSnackBar(SnackBar(content: Text(error.toString())));
     }
   }
 

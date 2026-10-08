@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -215,6 +216,8 @@ class _NewTransactionSheetState extends ConsumerState<NewTransactionSheet> {
         );
       }
       refreshFinance(ref);
+      // Saved: a firm tap, like Apple Pay's confirmation.
+      HapticFeedback.mediumImpact();
       if (!mounted) return;
       Navigator.pop(context);
       messenger.showSnackBar(

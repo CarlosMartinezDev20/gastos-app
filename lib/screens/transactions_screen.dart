@@ -4,8 +4,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/theme/app_palette.dart';
+import '../core/theme/motion.dart';
 import '../core/utils/csv_export.dart';
 import '../core/utils/file_export/file_export.dart';
 import '../core/utils/formatters.dart';
@@ -41,6 +43,9 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
 
   /// The last list shown, kept on screen while new filters load.
   HistoryState? _shown;
+
+  /// Swiped away: off the list at once, before the reload confirms it.
+  final _swiped = <String>{};
 
   @override
   void dispose() {
@@ -169,7 +174,9 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     Object? error,
   }) {
     final palette = context.palette;
-    final filtered = history.items;
+    final filtered = history.items
+        .where((t) => !_swiped.contains(t.id))
+        .toList();
     final hasFilters = _search.text.isNotEmpty || query.hasFilters;
     final income = history.summary.income;
     final expenses = history.summary.expense;
@@ -215,6 +222,11 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                         title: 'Movimientos',
                         subtitle: 'Cada ingreso y cada gasto',
                         trailing: [
+                          CircleButton(
+                            icon: CupertinoIcons.repeat,
+                            tooltip: 'Movimientos recurrentes',
+                            onPressed: () => context.push('/recurring'),
+                          ),
                           CircleButton(
                             icon: CupertinoIcons.arrow_down_doc,
                             tooltip: 'Exportar CSV',
@@ -370,46 +382,50 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               else
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  sliver: SliverList.builder(
-                    itemCount: days.length,
-                    itemBuilder: (context, index) {
-                      final day = days[index];
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
-                            child: Text(
-                              day.heading,
-                              style: Theme.of(context).textTheme.titleSmall
-                                  ?.copyWith(color: palette.muted),
+                  // Dimmed while the list for new filters is on its way.
+                  sliver: SliverAnimatedOpacity(
+                    opacity: updating ? .45 : 1,
+                    duration: Motion.of(context, Motion.fast),
+                    sliver: SliverList.builder(
+                      itemCount: days.length,
+                      itemBuilder: (context, index) {
+                        final day = days[index];
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
+                              child: Text(
+                                day.heading,
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(color: palette.muted),
+                              ),
                             ),
-                          ),
-                          BentoCard(
-                            padding: EdgeInsets.zero,
-                            child: Column(
-                              children: [
-                                for (final (i, t) in day.items.indexed) ...[
-                                  if (i > 0)
-                                    Divider(
-                                      height: 1,
-                                      indent: 72,
-                                      color: palette.hairline,
+                            BentoCard(
+                              padding: EdgeInsets.zero,
+                              child: Column(
+                                children: [
+                                  for (final (i, t) in day.items.indexed) ...[
+                                    if (i > 0)
+                                      Divider(
+                                        height: 1,
+                                        indent: 72,
+                                        color: palette.hairline,
+                                      ),
+                                    _SwipeToDelete(
+                                      key: ValueKey(t.id),
+                                      transaction: t,
+                                      onDeleted: () =>
+                                          setState(() => _swiped.add(t.id)),
                                     ),
-                                  Padding(
-                                    key: ValueKey(t.id),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                    ),
-                                    child: TransactionTile(transaction: t),
-                                  ),
+                                  ],
                                 ],
-                              ],
+                              ),
                             ),
-                          ),
-                        ],
-                      );
-                    },
+                          ],
+                        );
+                      },
+                    ),
                   ),
                 ),
               if (history.hasMore || history.loadMoreError != null)
@@ -444,6 +460,66 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A movement row that deletes when swiped to the left, like iOS Mail,
+/// with the same "Deshacer" as the detail sheet. Goal contributions are
+/// managed from Metas, so they don't swipe.
+class _SwipeToDelete extends ConsumerWidget {
+  const _SwipeToDelete({
+    super.key,
+    required this.transaction,
+    required this.onDeleted,
+  });
+
+  final Transaction transaction;
+  final VoidCallback onDeleted;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tile = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: TransactionTile(transaction: transaction),
+    );
+    if (transaction.isGoalContribution) return tile;
+    final error = Theme.of(context).colorScheme.error;
+    return Dismissible(
+      key: ValueKey('swipe-${transaction.id}'),
+      direction: DismissDirection.endToStart,
+      dismissThresholds: const {DismissDirection.endToStart: .35},
+      movementDuration: Motion.of(context, Motion.medium),
+      resizeDuration: Motion.of(context, Motion.medium),
+      onUpdate: (details) {
+        // A tick when the swipe crosses the point of no return.
+        if (details.reached && !details.previousReached) {
+          HapticFeedback.mediumImpact();
+        }
+      },
+      background: Container(
+        color: error,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 22),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(CupertinoIcons.trash, color: Colors.white, size: 20),
+            SizedBox(width: 6),
+            Text(
+              'Eliminar',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+      confirmDismiss: (_) =>
+          deleteTransactionWithUndo(context, ref, transaction),
+      onDismissed: (_) => onDeleted(),
+      child: tile,
     );
   }
 }
@@ -493,8 +569,8 @@ class _SummaryTile extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.centerLeft,
-          child: Text(
-            Formatters.compactMoney(amount),
+          child: AnimatedAmount(
+            amount,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: onColor,
               fontWeight: FontWeight.w700,

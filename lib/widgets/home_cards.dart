@@ -227,9 +227,9 @@ class _BigAmount extends StatelessWidget {
   Widget build(BuildContext context) => FittedBox(
     fit: BoxFit.scaleDown,
     alignment: Alignment.centerLeft,
-    child: Text(
-      Formatters.compactMoney(value),
-      style: TextStyle(
+    child: AnimatedAmount(
+      value,
+      style: const TextStyle(
         fontSize: 22,
         fontWeight: FontWeight.w800,
         letterSpacing: -.6,
@@ -312,19 +312,9 @@ class _BalanceCardState extends ConsumerState<BalanceCard> {
                             alignment: Alignment.centerLeft,
                             child: _hidden
                                 ? Text('••••••', style: amountStyle)
-                                : TweenAnimationBuilder<double>(
-                                    tween: Tween(
-                                      begin: 0,
-                                      end: data.balance.balance,
-                                    ),
-                                    duration: animations
-                                        ? Motion.emphasis
-                                        : Duration.zero,
-                                    curve: Motion.standard,
-                                    builder: (context, value, _) => Text(
-                                      Formatters.compactMoney(value),
-                                      style: amountStyle,
-                                    ),
+                                : AnimatedAmount(
+                                    data.balance.balance,
+                                    style: amountStyle,
                                   ),
                           ),
                         ),

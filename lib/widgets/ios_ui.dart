@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../core/theme/app_palette.dart';
 import '../core/theme/motion.dart';
+import '../core/utils/formatters.dart';
 
 /// Bottom padding for a tab page's scroll view: the shell lets content run
 /// behind the floating dock (Scaffold.extendBody), so the last item needs
@@ -405,6 +406,39 @@ class _BentoCardState extends State<BentoCard> {
 
 /// Fades and slides its child up once, when it first appears. Use [index]
 /// to stagger the items of a page.
+/// Money that counts up to its value when it appears and glides to the new
+/// one when it changes (after saving a movement, a payment…). Tabular
+/// figures keep the width steady while the digits roll.
+class AnimatedAmount extends StatelessWidget {
+  const AnimatedAmount(
+    this.value, {
+    super.key,
+    this.style,
+    this.format = Formatters.compactMoney,
+  });
+
+  final double value;
+  final TextStyle? style;
+  final String Function(double) format;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = (this.style ?? const TextStyle()).copyWith(
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    return Semantics(
+      label: format(value),
+      excludeSemantics: true,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: value),
+        duration: Motion.of(context, Motion.emphasis),
+        curve: Motion.standard,
+        builder: (context, shown, _) => Text(format(shown), style: style),
+      ),
+    );
+  }
+}
+
 class FadeSlideIn extends StatefulWidget {
   const FadeSlideIn({super.key, required this.child, this.index = 0});
 

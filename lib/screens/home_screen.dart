@@ -11,7 +11,6 @@ import '../providers/home_layout_provider.dart';
 import '../widgets/app_states.dart';
 import '../widgets/home_cards.dart';
 import '../widgets/ios_ui.dart';
-import '../widgets/theme_toggle.dart';
 import 'customize_home_screen.dart';
 
 /// Content wider than this shows two columns.
@@ -209,7 +208,11 @@ class _Header extends StatelessWidget {
           onPressed: () => context.push('/customize-home'),
         ),
         const SizedBox(width: 8),
-        const ThemeToggle(),
+        CircleButton(
+          icon: CupertinoIcons.creditcard,
+          tooltip: 'Mi wallet',
+          onPressed: () => context.push('/wallet'),
+        ),
         const SizedBox(width: 8),
         Tooltip(
           message: 'Perfil',

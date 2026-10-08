@@ -126,8 +126,8 @@ class _GoalsSummary extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          Text(
-            Formatters.compactMoney(saved),
+          AnimatedAmount(
+            saved,
             style: Theme.of(context).textTheme.displaySmall?.copyWith(
               color: palette.onInk,
               fontSize: 40,

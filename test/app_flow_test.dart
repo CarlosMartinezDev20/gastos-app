@@ -94,6 +94,12 @@ Future<void> openProfile(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// The wallet opens from the card button in the Inicio header.
+Future<void> openWallet(WidgetTester tester) async {
+  await goToTab(tester, 'Inicio');
+  await tester.tap(find.byTooltip('Mi wallet'));
+}
+
 Future<void> scrollTo(WidgetTester tester, Finder finder) async {
   await tester.scrollUntilVisible(
     finder,
@@ -322,6 +328,33 @@ void main() {
     expect(find.text('Almuerzo facultad'), findsOneWidget);
   });
 
+  testWidgets('swiping a movement left deletes it, with undo', (tester) async {
+    final backend = await pumpApp(tester);
+    await goToTab(tester, 'Historial');
+    await scrollTo(tester, find.text('Almuerzo facultad'));
+
+    // A short swipe springs back.
+    await tester.drag(find.text('Almuerzo facultad'), const Offset(-60, 0));
+    await tester.pumpAndSettle();
+    expect(backend.calls, isNot(contains('deleteTransaction:t2')));
+
+    await tester.drag(find.text('Almuerzo facultad'), const Offset(-300, 0));
+    await tester.pumpAndSettle();
+    expect(backend.calls, contains('deleteTransaction:t2'));
+    expect(find.text('Almuerzo facultad'), findsNothing);
+
+    await tester.tap(find.text('Deshacer'));
+    await tester.pumpAndSettle();
+    await scrollTo(tester, find.text('Almuerzo facultad'));
+    expect(find.text('Almuerzo facultad'), findsOneWidget);
+
+    // Goal contributions don't swipe: they're managed from Metas.
+    await scrollTo(tester, find.text('Ahorro: Laptop'));
+    await tester.drag(find.text('Ahorro: Laptop'), const Offset(-300, 0));
+    await tester.pumpAndSettle();
+    expect(backend.calls, isNot(contains('deleteTransaction:t3')));
+  });
+
   testWidgets('edits a movement', (tester) async {
     final backend = await pumpApp(tester);
     await goToTab(tester, 'Historial');
@@ -454,9 +487,7 @@ void main() {
     tester,
   ) async {
     final backend = await pumpApp(tester);
-    await openProfile(tester);
-    await scrollTo(tester, find.text('Mi wallet'));
-    await tester.tap(find.text('Mi wallet'));
+    await openWallet(tester);
     await tester.pumpAndSettle();
     expect(find.text('Tu wallet está vacía'), findsOneWidget);
 
@@ -525,9 +556,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // The wallet adds it to this statement and the card can be removed.
-    await openProfile(tester);
-    await scrollTo(tester, find.text('Mi wallet'));
-    await tester.tap(find.text('Mi wallet'));
+    await openWallet(tester);
     await tester.pumpAndSettle();
     expect(find.text(r'$20.00'), findsOneWidget);
     expect(find.textContaining(r'Disponible $480.00'), findsOneWidget);
@@ -700,9 +729,8 @@ void main() {
 
   testWidgets('creates, edits and deletes a category', (tester) async {
     final backend = await pumpApp(tester);
-    await openProfile(tester);
-    await scrollTo(tester, find.text('Categorías'));
-    await tester.tap(find.text('Categorías'));
+    await goToTab(tester, 'Análisis');
+    await tester.tap(find.byTooltip('Categorías'));
     await tester.pumpAndSettle();
     expect(find.text('Aún no tienes categorías propias'), findsOneWidget);
     // System categories are listed with their movement count, read-only.
@@ -899,7 +927,9 @@ void main() {
     tester,
   ) async {
     final backend = await pumpApp(tester);
-    await openProfile(tester);
+    // Wallet > Pagos fijos > Suscripciones.
+    await openWallet(tester);
+    await tester.pumpAndSettle();
     await scrollTo(tester, find.text('Suscripciones'));
     await tester.tap(find.text('Suscripciones'));
     await tester.pumpAndSettle();
@@ -1118,10 +1148,9 @@ void main() {
     expect(find.text('Se repetirá cada mes'), findsOneWidget);
     expect(backend.transactions.last.isRecurring, isTrue);
 
-    // Listed in Perfil > Movimientos recurrentes; it can be paused.
-    await openProfile(tester);
-    await scrollTo(tester, find.text('Movimientos recurrentes'));
-    await tester.tap(find.text('Movimientos recurrentes'));
+    // Listed from Historial > Movimientos recurrentes; it can be paused.
+    await goToTab(tester, 'Historial');
+    await tester.tap(find.byTooltip('Movimientos recurrentes'));
     await tester.pumpAndSettle();
     expect(find.text('Spotify'), findsOneWidget);
     expect(find.textContaining('Mensual · próximo'), findsOneWidget);
@@ -1167,9 +1196,7 @@ void main() {
     );
     final balance = backend.balance;
 
-    await openProfile(tester);
-    await scrollTo(tester, find.text('Mi wallet'));
-    await tester.tap(find.text('Mi wallet'));
+    await openWallet(tester);
     await tester.pumpAndSettle();
     expect(find.textContaining(r'Debes $200.00'), findsOneWidget);
 
@@ -1233,9 +1260,8 @@ void main() {
     expect(backend.transactions.last.paymentMethodId, 'pm1');
 
     // Editing the rule can clear it.
-    await openProfile(tester);
-    await scrollTo(tester, find.text('Movimientos recurrentes'));
-    await tester.tap(find.text('Movimientos recurrentes'));
+    await goToTab(tester, 'Historial');
+    await tester.tap(find.byTooltip('Movimientos recurrentes'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Netflix'));
     await tester.pumpAndSettle();

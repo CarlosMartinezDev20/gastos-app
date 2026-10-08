@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../core/theme/app_palette.dart';
 import '../core/theme/motion.dart';
 import '../core/utils/formatters.dart';
+import '../core/utils/subscriptions.dart';
 import '../core/utils/wallet.dart';
 import '../models/transaction.dart';
 import '../providers/finance_providers.dart';
@@ -108,6 +109,8 @@ class WalletScreen extends ConsumerWidget {
                               ],
                             ],
                     ),
+                    const SizedBox(height: 28),
+                    const _FixedPayments(),
                     const SizedBox(height: 24),
                     const _PrivacyNote(),
                   ],
@@ -374,6 +377,56 @@ class _EmptyWallet extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// What leaves every month on its own: subscriptions and the other
+/// recurring movements, one tap from the cards that pay them.
+class _FixedPayments extends ConsumerWidget {
+  const _FixedPayments();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = context.palette;
+    final rules = ref.watch(recurringProvider).value ?? const [];
+    final subs = rules.where((r) => r.isSubscription).toList();
+    final active = subs.where((s) => s.active).toList();
+    final others = rules.where((r) => r.active && !r.isSubscription).length;
+    Widget value(String text) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(text, style: TextStyle(color: palette.muted)),
+        const SizedBox(width: 6),
+        Icon(CupertinoIcons.chevron_right, size: 16, color: palette.muted),
+      ],
+    );
+    return InsetGroup(
+      header: 'Pagos fijos',
+      children: [
+        InsetTile(
+          icon: CupertinoIcons.play_rectangle_fill,
+          iconColor: const Color(0xFFE5484D),
+          title: 'Suscripciones',
+          trailing: value(
+            active.isEmpty
+                ? 'Agregar'
+                : '${Formatters.compactMoney(monthlySubscriptionCost(subs))}/mes',
+          ),
+          onTap: () => context.push('/subscriptions'),
+        ),
+        InsetTile(
+          icon: CupertinoIcons.repeat,
+          iconColor: const Color(0xFF3B82C4),
+          title: 'Movimientos recurrentes',
+          trailing: value(
+            others == 0
+                ? 'Ninguno'
+                : '$others ${others == 1 ? 'activo' : 'activos'}',
+          ),
+          onTap: () => context.push('/recurring'),
+        ),
+      ],
     );
   }
 }

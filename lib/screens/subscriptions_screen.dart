@@ -148,8 +148,8 @@ class _TotalCard extends StatelessWidget {
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(
-              Formatters.compactMoney(monthly),
+            child: AnimatedAmount(
+              monthly,
               style: Theme.of(context).textTheme.displaySmall?.copyWith(
                 color: palette.onInk,
                 fontWeight: FontWeight.w800,

@@ -189,8 +189,8 @@ class _Total extends StatelessWidget {
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(
-              Formatters.compactMoney(value),
+            child: AnimatedAmount(
+              value,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 color: onColor,
                 fontWeight: FontWeight.w800,

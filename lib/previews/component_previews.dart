@@ -298,3 +298,30 @@ Widget phoneWidgets() => Padding(
     ],
   ),
 );
+
+@AppPreview(name: 'Monto animado', group: 'Controles', size: Size(390, 140))
+Widget animatedAmounts() => const _AmountDemo();
+
+/// Tap to change the amount and watch it glide to the new value.
+class _AmountDemo extends StatefulWidget {
+  const _AmountDemo();
+
+  @override
+  State<_AmountDemo> createState() => _AmountDemoState();
+}
+
+class _AmountDemoState extends State<_AmountDemo> {
+  var _value = 782.15;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: () => setState(() => _value = _value > 500 ? 137.85 : 782.15),
+    child: Padding(
+      padding: const EdgeInsets.all(20),
+      child: AnimatedAmount(
+        _value,
+        style: Theme.of(context).textTheme.displaySmall,
+      ),
+    ),
+  );
+}

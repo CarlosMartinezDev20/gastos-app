@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../core/constants/app_constants.dart';
 import '../core/theme/app_palette.dart';
@@ -94,42 +93,6 @@ class ProfileScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 28),
-              InsetGroup(
-                header: 'Finanzas',
-                children: [
-                  InsetTile(
-                    icon: CupertinoIcons.creditcard_fill,
-                    iconColor: const Color(0xFF1E3A8A),
-                    title: 'Mi wallet',
-                    onTap: () => context.push('/wallet'),
-                  ),
-                  InsetTile(
-                    icon: CupertinoIcons.play_rectangle_fill,
-                    iconColor: const Color(0xFFE5484D),
-                    title: 'Suscripciones',
-                    onTap: () => context.push('/subscriptions'),
-                  ),
-                  InsetTile(
-                    icon: CupertinoIcons.square_grid_2x2_fill,
-                    iconColor: const Color(0xFF6E8B00),
-                    title: 'Categorías',
-                    onTap: () => context.push('/categories'),
-                  ),
-                  InsetTile(
-                    icon: CupertinoIcons.slider_horizontal_3,
-                    iconColor: const Color(0xFF7A5AF8),
-                    title: 'Calculadora de presupuestos',
-                    onTap: () => context.push('/budget-planner'),
-                  ),
-                  InsetTile(
-                    icon: CupertinoIcons.repeat,
-                    iconColor: const Color(0xFF3B82C4),
-                    title: 'Movimientos recurrentes',
-                    onTap: () => context.push('/recurring'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
               InsetGroup(
                 header: 'Preferencias',
                 children: [
