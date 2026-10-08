@@ -558,8 +558,10 @@ void main() {
     // The wallet adds it to this statement and the card can be removed.
     await openWallet(tester);
     await tester.pumpAndSettle();
-    expect(find.text(r'$20.00'), findsOneWidget);
-    expect(find.textContaining(r'Disponible $480.00'), findsOneWidget);
+    // On the card (this statement) and below it (what's owed).
+    expect(find.text(r'$20.00'), findsNWidgets(2));
+    expect(find.text('Disponible'), findsOneWidget);
+    expect(find.text(r'$480.00'), findsOneWidget);
 
     await tester.tap(find.text('•••• 4821'));
     await tester.pumpAndSettle();
@@ -1153,7 +1155,7 @@ void main() {
     await tester.tap(find.byTooltip('Movimientos recurrentes'));
     await tester.pumpAndSettle();
     expect(find.text('Spotify'), findsOneWidget);
-    expect(find.textContaining('Mensual · próximo'), findsOneWidget);
+    expect(find.textContaining('Mensual · '), findsOneWidget);
     await tester.tap(find.byType(CupertinoSwitch));
     await tester.pumpAndSettle();
     expect(backend.recurring.single.active, isFalse);
@@ -1198,7 +1200,8 @@ void main() {
 
     await openWallet(tester);
     await tester.pumpAndSettle();
-    expect(find.textContaining(r'Debes $200.00'), findsOneWidget);
+    expect(find.text('Debes'), findsOneWidget);
+    expect(find.text(r'$200.00'), findsWidgets);
 
     await tester.tap(find.text('•••• 4821'));
     await tester.pumpAndSettle();

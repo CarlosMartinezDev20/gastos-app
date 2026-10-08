@@ -133,7 +133,6 @@ class _WalletEntry extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
     final limit = summary.limit;
     final due = summary.dueDate;
     return Column(
@@ -160,18 +159,35 @@ class _WalletEntry extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                 ],
-                Text(
-                  [
-                    if (summary.debt case final debt?) _debtLabel(debt),
+                // Three short facts side by side instead of one long line.
+                Row(
+                  children: [
+                    if (summary.debt case final debt?)
+                      _Fact(
+                        label: debt > 0
+                            ? 'Debes'
+                            : debt < 0
+                            ? 'A favor'
+                            : 'Deuda',
+                        value: debt == 0
+                            ? 'Al día'
+                            : Formatters.compactMoney(debt.abs()),
+                      ),
                     if (summary.available case final available?)
-                      available < 0
-                          ? 'Pasaste el límite por '
-                                '${Formatters.compactMoney(-available)}'
-                          : 'Disponible ${Formatters.compactMoney(available)} '
-                                'de ${Formatters.compactMoney(limit!)}',
-                    if (due != null) _dueLabel(due),
-                  ].join(' · '),
-                  style: TextStyle(color: palette.muted, fontSize: 13),
+                      _Fact(
+                        label: available < 0 ? 'Sobre el límite' : 'Disponible',
+                        value: Formatters.compactMoney(available.abs()),
+                        alert: available < 0,
+                      ),
+                    if (due != null)
+                      _Fact(
+                        label: 'Pago',
+                        value: _dueLabel(due),
+                        alert:
+                            daysUntil(due, DateTime.now()) <= 3 &&
+                            (summary.debt ?? 0) > 0,
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -188,12 +204,44 @@ String _debtLabel(double debt) => debt > 0
     ? '${Formatters.compactMoney(-debt)} a favor'
     : 'Al día';
 
+class _Fact extends StatelessWidget {
+  const _Fact({required this.label, required this.value, this.alert = false});
+
+  final String label;
+  final String value;
+  final bool alert;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(color: palette.muted, fontSize: 12)),
+          const SizedBox(height: 1),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+              color: alert ? Theme.of(context).colorScheme.error : null,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 String _dueLabel(DateTime due) {
   final days = daysUntil(due, DateTime.now());
   return switch (days) {
-    0 => 'Pago hoy',
-    1 => 'Pago mañana',
-    _ => 'Pago en $days días',
+    0 => 'Hoy',
+    1 => 'Mañana',
+    _ => 'En $days días',
   };
 }
 
@@ -250,7 +298,7 @@ class _WalletDetail extends ConsumerWidget {
         (
           CupertinoIcons.calendar,
           'Fecha de pago',
-          '${shortDay.format(due)} · ${_dueLabel(due).replaceFirst('Pago ', '')}',
+          '${shortDay.format(due)} · ${_dueLabel(due).toLowerCase()}',
         ),
     ];
     return SingleChildScrollView(

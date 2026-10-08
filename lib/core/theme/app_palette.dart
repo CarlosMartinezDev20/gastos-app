@@ -59,8 +59,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
   final Color pill;
   final Color onPill;
 
-  /// Cash-flow chart series (checked for color-blind separation and 3:1
-  /// contrast against the card in each mode).
+  /// Cash-flow chart series, in the brand's lime and ink: each has 3:1
+  /// contrast against the card and they differ in lightness, so they stay
+  /// apart for color-blind eyes (light: deep lime vs ink; dark: lime vs grey).
   final Color chartIncome;
   final Color chartExpense;
 
@@ -82,8 +83,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     muted: Color(0xFF64646D),
     pill: Color(0xFF202122),
     onPill: Colors.white,
-    chartIncome: Color(0xFF3FA45B),
-    chartExpense: Color(0xFF4A93D9),
+    chartIncome: Color(0xFF6E9600),
+    chartExpense: Color(0xFF1C1C1E),
   );
 
   static const dark = AppPalette(
@@ -104,8 +105,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     muted: Color(0xFFB4B5BB),
     pill: Color(0xFFEDEEF0),
     onPill: Color(0xFF202122),
-    chartIncome: Color(0xFF43A35D),
-    chartExpense: Color(0xFF4E97DE),
+    chartIncome: Color(0xFFC8F04B),
+    chartExpense: Color(0xFF8E8E93),
   );
 
   @override

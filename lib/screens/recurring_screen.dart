@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../core/theme/app_palette.dart';
 import '../core/utils/formatters.dart';
+import '../core/utils/subscriptions.dart';
 import '../models/category.dart';
 import '../models/recurring.dart';
 import '../providers/finance_providers.dart';
@@ -140,21 +140,50 @@ class _RecurringList extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 20),
-        FadeSlideIn(
-          index: 1,
-          child: BentoCard(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Column(
-              children: [
-                for (final (i, rule) in items.indexed) ...[
-                  if (i > 0) const Divider(indent: 72, height: 1),
-                  _RecurringRow(rule: rule),
+        // Grouped by what they are, like the iOS Settings lists.
+        for (final (i, (title, group, link)) in [
+          (
+            'Ingresos',
+            items.where((r) => r.type == TransactionType.income).toList(),
+            false,
+          ),
+          (
+            'Gastos fijos',
+            items
+                .where(
+                  (r) => r.type == TransactionType.expense && !r.isSubscription,
+                )
+                .toList(),
+            false,
+          ),
+          (
+            'Suscripciones',
+            items.where((r) => r.isSubscription).toList(),
+            true,
+          ),
+        ].where((g) => g.$2.isNotEmpty).indexed) ...[
+          const SizedBox(height: 24),
+          SectionHeader(
+            title: title,
+            action: link ? 'Ver todas' : null,
+            onAction: link ? () => context.push('/subscriptions') : null,
+          ),
+          const SizedBox(height: 8),
+          FadeSlideIn(
+            index: i + 1,
+            child: BentoCard(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Column(
+                children: [
+                  for (final (j, rule) in group.indexed) ...[
+                    if (j > 0) const Divider(indent: 72, height: 1),
+                    _RecurringRow(rule: rule),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -212,7 +241,7 @@ class _RecurringRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = context.palette;
     final (tile, onTile) = categoryColors(palette, rule.type);
-    final next = DateFormat("d 'de' MMM", 'es').format(rule.nextDate.toLocal());
+    final next = chargeLabel(rule.nextDate);
     final income = rule.type == TransactionType.income;
     return ListTile(
       onTap: () => showModalBottomSheet<void>(
@@ -243,17 +272,30 @@ class _RecurringRow extends ConsumerWidget {
                 ),
               ),
       ),
-      title: Text(
-        rule.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontWeight: FontWeight.w600),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              rule.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${income ? '+' : '−'}${Formatters.compactMoney(rule.amount)}',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: rule.active ? null : palette.muted,
+            ),
+          ),
+        ],
       ),
       subtitle: Text(
-        rule.active
-            ? '${income ? '+' : '−'}${Formatters.compactMoney(rule.amount)} · '
-                  '${rule.frequency.label} · próximo $next'
-            : 'En pausa',
+        rule.active ? '${rule.frequency.label} · $next' : 'En pausa',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(color: palette.muted),
       ),
       trailing: AppSwitch(

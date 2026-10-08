@@ -183,10 +183,15 @@ class _FlowChart extends StatelessWidget {
     final palette = context.palette;
     final scheme = Theme.of(context).colorScheme;
     final spent = buckets.fold(0.0, (sum, b) => sum + b.spent);
-    final maxY = buckets.fold(
-      0.0,
-      (m, b) => [m, b.income, b.spent].reduce((a, c) => a > c ? a : c),
-    );
+    final maxSpent = buckets.fold(0.0, (m, b) => b.spent > m ? b.spent : m);
+    final maxIncome = buckets.fold(0.0, (m, b) => b.income > m ? b.income : m);
+    // A payday can be ten times a day's spending and flatten every other
+    // bar: past 2.5× the top spending, income bars are cut (and fade out at
+    // the cut); the tooltip still shows the whole amount.
+    final cap = maxSpent > 0 && maxIncome > maxSpent * 2.5
+        ? maxSpent * 2.5
+        : null;
+    final maxY = cap ?? (maxIncome > maxSpent ? maxIncome : maxSpent);
     final averageLabel = switch (period) {
       FlowPeriod.week => 'Promedio diario',
       FlowPeriod.month => 'Promedio semanal',
@@ -353,8 +358,18 @@ class _FlowChart extends StatelessWidget {
                             (buckets[i].spent, palette.chartExpense),
                           ])
                             BarChartRodData(
-                              toY: value,
-                              color: color,
+                              toY: cap != null && value > cap ? cap : value,
+                              color: cap != null && value > cap ? null : color,
+                              gradient: cap != null && value > cap
+                                  ? LinearGradient(
+                                      begin: Alignment.bottomCenter,
+                                      end: Alignment.topCenter,
+                                      colors: [
+                                        color,
+                                        color.withValues(alpha: .15),
+                                      ],
+                                    )
+                                  : null,
                               width: period == FlowPeriod.year ? 7 : 12,
                               borderRadius: const BorderRadius.vertical(
                                 top: Radius.circular(4),

@@ -160,8 +160,14 @@ class _GoalCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = context.palette;
     final completed = goal.savedAmount >= goal.targetAmount;
-    final tint = completed ? palette.mint : palette.lilac;
-    final onTint = completed ? palette.onMint : palette.onLilac;
+    // Each goal keeps its own color (from its id, so it survives reordering);
+    // a finished one turns mint.
+    final lime = goal.id.hashCode.isEven;
+    final (tint, onTint, bar) = completed
+        ? (palette.mint, palette.onMint, palette.onMint)
+        : lime
+        ? (palette.accent, palette.onAccent, palette.chartIncome)
+        : (palette.lilac, palette.onLilac, palette.onLilac);
     return FadeSlideIn(
       index: index,
       child: BentoCard(
@@ -251,7 +257,7 @@ class _GoalCard extends ConsumerWidget {
               child: AnimatedProgressBar(
                 value: goal.progressPercent / 100,
                 height: 10,
-                color: completed ? palette.onMint : null,
+                color: bar,
               ),
             ),
             const SizedBox(height: 12),
