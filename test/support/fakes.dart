@@ -47,6 +47,9 @@ const daniela = UserProfile(
 
 /// In-memory backend that mimics the API rules the app relies on.
 class FakeBackend {
+  /// The signed-in account's password.
+  String password = 'daniela123';
+
   /// The user's own categories (the system ones are [food] and [salary]).
   final customCategories = <Category>[];
 
@@ -159,7 +162,7 @@ class FakeAuthRepository implements AuthRepository {
     required String password,
   }) async {
     backend.calls.add('login');
-    if (password != 'daniela123') {
+    if (password != backend.password) {
       throw const ApiException('Credenciales inválidas', statusCode: 401);
     }
     backend.token = 'token';
@@ -194,6 +197,33 @@ class FakeAuthRepository implements AuthRepository {
   Future<UserProfile> updateProfile({bool? darkMode, String? name}) async {
     backend.user = backend.user.copyWith(darkMode: darkMode, name: name);
     return backend.user;
+  }
+
+  @override
+  Future<void> changePassword({
+    required String current,
+    required String next,
+  }) async {
+    if (current != backend.password) {
+      throw const ApiException(
+        'La contraseña actual no es correcta',
+        statusCode: 400,
+      );
+    }
+    backend.calls.add('changePassword');
+    backend.password = next;
+  }
+
+  @override
+  Future<void> deleteAccount(String password) async {
+    if (password != backend.password) {
+      throw const ApiException(
+        'La contraseña actual no es correcta',
+        statusCode: 400,
+      );
+    }
+    backend.calls.add('deleteAccount');
+    backend.token = null;
   }
 
   @override

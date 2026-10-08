@@ -72,5 +72,33 @@ class AuthRepository {
     }
   }
 
+  /// Signs out the other devices; this one keeps going with a new token.
+  Future<void> changePassword({
+    required String current,
+    required String next,
+  }) async {
+    try {
+      final response = await _api.dio.patch(
+        ApiEndpoints.password,
+        data: {'currentPassword': current, 'newPassword': next},
+      );
+      await _api.saveToken(
+        (response.data as Map<String, dynamic>)['accessToken'] as String,
+      );
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+  }
+
+  /// Deletes the account and all its data, then forgets the session.
+  Future<void> deleteAccount(String password) async {
+    try {
+      await _api.dio.delete(ApiEndpoints.profile, data: {'password': password});
+    } catch (error) {
+      throw _api.parseError(error);
+    }
+    await _api.clearToken();
+  }
+
   Future<void> logout() => _api.clearToken();
 }

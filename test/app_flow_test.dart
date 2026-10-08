@@ -607,6 +607,52 @@ void main() {
     expect(find.text('Comenzar'), findsOneWidget);
   });
 
+  testWidgets('changes the password', (tester) async {
+    final backend = await pumpApp(tester);
+    await openProfile(tester);
+    await scrollTo(tester, find.text('Cambiar contraseña'));
+    await tester.tap(find.text('Cambiar contraseña'));
+    await tester.pumpAndSettle();
+
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), 'equivocada');
+    await tester.enterText(fields.at(1), 'nuevaClave1');
+    await tester.enterText(fields.at(2), 'otraCosa1');
+    await tester.tap(find.text('Cambiar contraseña').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Las contraseñas no coinciden'), findsOneWidget);
+
+    await tester.enterText(fields.at(2), 'nuevaClave1');
+    await tester.tap(find.text('Cambiar contraseña').last);
+    await tester.pumpAndSettle();
+    expect(find.text('La contraseña actual no es correcta'), findsOneWidget);
+
+    await tester.enterText(fields.at(0), 'daniela123');
+    await tester.tap(find.text('Cambiar contraseña').last);
+    await tester.pumpAndSettle();
+    expect(backend.password, 'nuevaClave1');
+    expect(find.textContaining('Contraseña actualizada'), findsOneWidget);
+    // Still signed in on this device.
+    expect(find.text('Cerrar sesión'), findsOneWidget);
+  });
+
+  testWidgets('deletes the account after the password', (tester) async {
+    final backend = await pumpApp(tester);
+    await openProfile(tester);
+    await scrollTo(tester, find.text('Eliminar cuenta'));
+    await tester.tap(find.text('Eliminar cuenta'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextFormField), 'daniela123');
+    await tester.tap(find.text('Eliminar mi cuenta'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Eliminar'));
+    await tester.pumpAndSettle();
+    expect(backend.calls, contains('deleteAccount'));
+    expect(find.text('Tu cuenta fue eliminada'), findsOneWidget);
+    expect(find.text('Comenzar'), findsOneWidget);
+  });
+
   testWidgets('creates, edits and deletes a category', (tester) async {
     final backend = await pumpApp(tester);
     await openProfile(tester);

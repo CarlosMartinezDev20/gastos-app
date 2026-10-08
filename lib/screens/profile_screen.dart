@@ -12,6 +12,7 @@ import '../widgets/ios_ui.dart';
 import '../widgets/theme_toggle.dart';
 import '../widgets/theme_crossfade.dart';
 import '../providers/payment_reminders_provider.dart';
+import 'account_sheets.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -184,12 +185,25 @@ class ProfileScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 24),
               InsetGroup(
+                header: 'Cuenta',
                 children: [
+                  InsetTile(
+                    icon: CupertinoIcons.lock_fill,
+                    iconColor: const Color(0xFF0A84FF),
+                    title: 'Cambiar contraseña',
+                    onTap: () => showChangePasswordSheet(context),
+                  ),
                   InsetTile(
                     icon: CupertinoIcons.square_arrow_right,
                     title: 'Cerrar sesión',
                     destructive: true,
                     onTap: () => _confirmLogout(context, ref),
+                  ),
+                  InsetTile(
+                    icon: CupertinoIcons.trash,
+                    title: 'Eliminar cuenta',
+                    destructive: true,
+                    onTap: () => showDeleteAccountSheet(context),
                   ),
                 ],
               ),

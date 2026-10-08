@@ -4,6 +4,7 @@ class ApiEndpoints {
   static const authLogin = '/auth/login';
   static const authRegister = '/auth/register';
   static const profile = '/users/profile';
+  static const password = '/users/password';
   static const categories = '/categories';
   static const transactions = '/transactions';
   static const balance = '/transactions/balance';
