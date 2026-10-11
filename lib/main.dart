@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/auth/secure_session_storage.dart';
+import 'core/config/env.dart';
 import 'core/licenses.dart';
 import 'core/theme/app_theme.dart';
 import 'navigation/app_router.dart';
@@ -17,6 +20,14 @@ Future<void> main() async {
   registerBundledLicenses();
   await initializeDateFormatting('es');
   final prefs = await SharedPreferences.getInstance();
+  // Restores the saved session (secure storage) and keeps it refreshed.
+  await Supabase.initialize(
+    url: Env.supabaseUrl,
+    publishableKey: Env.supabasePublishableKey,
+    authOptions: FlutterAuthClientOptions(
+      localStorage: SecureSessionStorage(prefs),
+    ),
+  );
   runApp(
     ProviderScope(
       overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],

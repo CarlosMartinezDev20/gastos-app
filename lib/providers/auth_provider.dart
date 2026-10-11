@@ -1,12 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/auth/auth_gateway.dart';
 import '../core/network/api_client.dart';
 import '../models/user_profile.dart';
 import '../repositories/auth_repository.dart';
 import 'theme_provider.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  return AuthRepository(ref.watch(apiClientProvider));
+  return AuthRepository(
+    ref.watch(apiClientProvider),
+    ref.watch(authGatewayProvider),
+  );
 });
 
 /// Id of the signed-in user. Data providers watch it so cached data from a
@@ -33,8 +37,8 @@ class AuthController extends Notifier<AsyncValue<UserProfile?>> {
   }
 
   Future<void> load() async {
+    // Supabase restored any saved session before the app started.
     final api = ref.read(apiClientProvider);
-    await api.restoreToken();
     if (api.token == null) {
       state = const AsyncData(null);
       return;

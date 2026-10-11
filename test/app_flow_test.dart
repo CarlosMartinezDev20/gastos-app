@@ -1,5 +1,5 @@
 import 'package:appgastos/core/network/api_client.dart';
-import 'package:appgastos/core/network/token_store.dart';
+import 'package:appgastos/core/auth/auth_gateway.dart';
 import 'package:appgastos/core/theme/app_theme.dart';
 import 'package:appgastos/main.dart';
 import 'package:appgastos/models/transaction.dart';
@@ -52,9 +52,9 @@ Future<FakeBackend> pumpApp(
     ProviderScope(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
-        // No Keystore in tests: the session lives in memory.
-        tokenStoreProvider.overrideWithValue(
-          MemoryTokenStore(loggedIn ? 'token' : null),
+        // No Supabase in tests: the session lives in memory.
+        authGatewayProvider.overrideWithValue(
+          FakeAuthGateway(loggedIn ? 'token' : null),
         ),
         authRepositoryProvider.overrideWithValue(FakeAuthRepository(backend)),
         financeRepositoryProvider.overrideWithValue(

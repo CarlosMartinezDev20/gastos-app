@@ -3,10 +3,11 @@ import 'dart:typed_data';
 
 import 'package:appgastos/core/network/api_client.dart';
 import 'package:appgastos/core/network/response_cache.dart';
-import 'package:appgastos/core/network/token_store.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'support/fakes.dart';
 
 /// Answers with [body] while [online], else fails like a dropped network.
 class _Network implements HttpClientAdapter {
@@ -43,8 +44,7 @@ String jwt(String sub) =>
 
 Future<(ApiClient, _Network, SharedPreferences)> client(String user) async {
   final prefs = await SharedPreferences.getInstance();
-  final api = ApiClient(MemoryTokenStore(jwt(user)), ResponseCache(prefs));
-  await api.restoreToken();
+  final api = ApiClient(FakeAuthGateway(jwt(user)), ResponseCache(prefs));
   final network = _Network();
   api.dio.httpClientAdapter = network;
   return (api, network, prefs);
@@ -94,8 +94,7 @@ void main() {
       network.body = ['de alice'];
       await alice.dio.get('/transactions');
 
-      final bob = ApiClient(MemoryTokenStore(jwt('bob')), ResponseCache(prefs));
-      await bob.restoreToken();
+      final bob = ApiClient(FakeAuthGateway(jwt('bob')), ResponseCache(prefs));
       bob.dio.httpClientAdapter = network..online = false;
       await expectLater(
         bob.dio.get('/transactions'),

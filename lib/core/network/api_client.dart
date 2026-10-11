@@ -3,34 +3,37 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/storage_provider.dart';
+import '../auth/auth_gateway.dart';
+import '../config/env.dart';
 import '../errors/api_exception.dart';
 import 'response_cache.dart';
-import 'token_store.dart';
 
 final apiClientProvider = Provider<ApiClient>((ref) {
   return ApiClient(
-    ref.watch(tokenStoreProvider),
+    ref.watch(authGatewayProvider),
     ResponseCache(ref.watch(sharedPreferencesProvider)),
   );
 });
 
+/// The NestJS API. Every request carries the Supabase session's access
+/// token (`Authorization: Bearer …`), refreshed first when it is about to
+/// expire.
 class ApiClient {
-  ApiClient(this._store, [this._cache])
+  ApiClient(this._auth, [this._cache])
     : dio = Dio(
         BaseOptions(
-          baseUrl: const String.fromEnvironment(
-            'API_BASE_URL',
-            defaultValue: 'http://localhost:3001',
-          ),
+          baseUrl: Env.apiBaseUrl,
           connectTimeout: const Duration(seconds: 15),
-          receiveTimeout: const Duration(seconds: 15),
+          // The free Render instance sleeps when idle and takes up to about
+          // a minute to wake on the first request.
+          receiveTimeout: const Duration(seconds: 70),
           headers: {'Content-Type': 'application/json'},
         ),
       ) {
     dio.interceptors.add(
       InterceptorsWrapper(
-        onRequest: (options, handler) {
-          final token = _token;
+        onRequest: (options, handler) async {
+          final token = await _auth.freshAccessToken();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
           }
@@ -82,35 +85,27 @@ class ApiClient {
     );
   }
 
-  final TokenStore _store;
+  final AuthGateway _auth;
   final ResponseCache? _cache;
   final Dio dio;
 
   /// True while screens show saved data because the API can't be reached.
   final offline = ValueNotifier(false);
 
-  /// In memory after [restoreToken], so requests don't wait on storage.
-  String? _token;
+  /// The session's token (Supabase restores it from secure storage at
+  /// startup), for the offline cache's user and the signed-in check.
+  String? get _token => _auth.accessToken;
 
   /// Called when an authenticated request gets a 401. Set by AuthController.
   void Function()? onUnauthorized;
 
   String? get token => _token;
 
-  /// Loads the saved session, once, before the first request.
-  Future<void> restoreToken() async => _token ??= await _store.read();
-
-  Future<void> saveToken(String token) {
-    _token = token;
-    return _store.write(token);
-  }
-
   /// Signing out also forgets the saved answers (financial data).
   Future<void> clearToken() async {
-    _token = null;
     offline.value = false;
     await _cache?.clear();
-    await _store.delete();
+    await _auth.signOut();
   }
 
   ApiException parseError(Object error) {

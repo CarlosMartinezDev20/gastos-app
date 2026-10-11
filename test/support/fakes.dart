@@ -1,3 +1,4 @@
+import 'package:appgastos/core/auth/auth_gateway.dart';
 import 'package:appgastos/core/errors/api_exception.dart';
 import 'package:appgastos/core/utils/phone_widget.dart';
 import 'package:appgastos/services/phone_widget_service.dart';
@@ -151,6 +152,42 @@ class FakeBackend {
       ),
     );
   }
+}
+
+/// The session in memory instead of Supabase Auth (tests, previews).
+class FakeAuthGateway implements AuthGateway {
+  FakeAuthGateway([this.token]);
+
+  String? token;
+
+  @override
+  String? get accessToken => token;
+
+  @override
+  Future<String?> freshAccessToken() async => token;
+
+  @override
+  Future<void> signIn({
+    required String email,
+    required String password,
+  }) async {}
+
+  @override
+  Future<void> signUp({
+    required String name,
+    required String email,
+    required String password,
+  }) async {}
+
+  @override
+  Future<void> changePassword({
+    required String email,
+    required String current,
+    required String next,
+  }) async {}
+
+  @override
+  Future<void> signOut() async => token = null;
 }
 
 class FakeAuthRepository implements AuthRepository {
