@@ -66,6 +66,16 @@ class _SegmentedDemoState extends State<_SegmentedDemo> {
   );
 }
 
+@AppPreview(
+  name: 'Error de formulario',
+  group: 'Controles',
+  size: Size(390, 110),
+)
+Widget formError() => const Padding(
+  padding: EdgeInsets.all(16),
+  child: FormError('Sin conexión. Revisa tu Internet e intenta de nuevo.'),
+);
+
 @AppPreview(name: 'Botones', group: 'Controles', size: Size(390, 240))
 Widget buttons() => Padding(
   padding: const EdgeInsets.all(16),

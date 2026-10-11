@@ -57,6 +57,7 @@ class _NewGoalSheetState extends ConsumerState<NewGoalSheet> {
   );
   late String _icon = widget.goal?.icon ?? goalIcons.first.api;
   bool _saving = false;
+  String? _error;
 
   bool get _editing => widget.goal != null;
 
@@ -69,7 +70,10 @@ class _NewGoalSheetState extends ConsumerState<NewGoalSheet> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     final messenger = ScaffoldMessenger.of(context);
     final service = ref.read(savingsServiceProvider);
     final name = _name.text.trim();
@@ -99,7 +103,7 @@ class _NewGoalSheetState extends ConsumerState<NewGoalSheet> {
       );
     } catch (error) {
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text(error.toString())));
+      setState(() => _error = error.toString());
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -216,7 +220,8 @@ class _NewGoalSheetState extends ConsumerState<NewGoalSheet> {
                       )
                       .toList(),
                 ),
-                const Gap(18),
+                FormError(_error),
+                const Gap(12),
                 FilledButton.icon(
                   onPressed: _saving ? null : _save,
                   icon: _saving

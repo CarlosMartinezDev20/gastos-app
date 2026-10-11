@@ -86,6 +86,7 @@ class _NewTransactionSheetState extends ConsumerState<NewTransactionSheet> {
   /// null = a one-off movement; otherwise a recurring rule is created.
   late RecurrenceFrequency? _repeat = widget.repeat;
   bool _saving = false;
+  String? _error;
 
   bool get _editing => widget.transaction != null;
 
@@ -173,7 +174,10 @@ class _NewTransactionSheetState extends ConsumerState<NewTransactionSheet> {
       }
     }
 
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     final messenger = ScaffoldMessenger.of(context);
     final service = ref.read(transactionServiceProvider);
     final paymentMethodId = _methodFor(
@@ -235,9 +239,7 @@ class _NewTransactionSheetState extends ConsumerState<NewTransactionSheet> {
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      setState(() => _error = error.toString());
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -567,7 +569,8 @@ class _NewTransactionSheetState extends ConsumerState<NewTransactionSheet> {
                     },
                   ),
                 ],
-                const Gap(16),
+                FormError(_error),
+                const Gap(12),
                 FilledButton.icon(
                   style: FilledButton.styleFrom(shape: const StadiumBorder()),
                   onPressed: _saving ? null : _save,

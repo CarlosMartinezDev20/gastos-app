@@ -565,6 +565,57 @@ class _BubblePainter extends CustomPainter {
 }
 
 /// Small outlined capsule label ("Hoy · 1 oct").
+/// Why a form couldn't be saved, inside the form itself: a SnackBar would
+/// open under the bottom sheet the form lives in. Grows in and out.
+class FormError extends StatelessWidget {
+  const FormError(this.message, {super.key});
+
+  final String? message;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final text = message;
+    return AnimatedSize(
+      duration: Motion.of(context, Motion.medium),
+      curve: Motion.standard,
+      child: text == null
+          ? const SizedBox(width: double.infinity)
+          : Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: palette.blush,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Semantics(
+                liveRegion: true,
+                child: Row(
+                  children: [
+                    Icon(
+                      CupertinoIcons.exclamationmark_circle,
+                      color: palette.onBlush,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        text,
+                        style: TextStyle(
+                          color: palette.onBlush,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+}
+
 class PillTag extends StatelessWidget {
   const PillTag({super.key, required this.label, this.color, this.icon});
 

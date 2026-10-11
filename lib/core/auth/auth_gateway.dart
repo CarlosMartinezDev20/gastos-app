@@ -14,6 +14,11 @@ abstract interface class AuthGateway {
   /// (offline), so cached answers can still be found.
   Future<String?> freshAccessToken();
 
+  /// Refreshes the session now (after the API rejected its token). Null
+  /// when there is no session or Supabase refused the refresh token: the
+  /// session is over. Throws when Supabase can't be reached.
+  Future<String?> refreshAccessToken();
+
   Future<void> signIn({required String email, required String password});
 
   Future<void> signUp({
@@ -53,6 +58,18 @@ class SupabaseAuthGateway implements AuthGateway {
       return session.accessToken;
     } catch (_) {
       return session.accessToken;
+    }
+  }
+
+  @override
+  Future<String?> refreshAccessToken() async {
+    if (_auth.currentSession == null) return null;
+    try {
+      return (await _auth.refreshSession()).session?.accessToken;
+    } on AuthRetryableFetchException {
+      rethrow;
+    } on AuthException {
+      return null;
     }
   }
 

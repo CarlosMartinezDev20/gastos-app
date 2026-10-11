@@ -1,5 +1,6 @@
 import 'package:appgastos/core/network/api_client.dart';
 import 'package:appgastos/core/auth/auth_gateway.dart';
+import 'package:appgastos/core/errors/api_exception.dart';
 import 'package:appgastos/core/theme/app_theme.dart';
 import 'package:appgastos/main.dart';
 import 'package:appgastos/models/transaction.dart';
@@ -35,6 +36,7 @@ Future<FakeBackend> pumpApp(
   Size size = phone,
   bool loggedIn = true,
   bool withData = true,
+  ApiException? startupError,
   FakePhoneWidgetService? phoneWidget,
   ScanDraft? scan,
   FakePaymentReminderService? reminders,
@@ -45,6 +47,7 @@ Future<FakeBackend> pumpApp(
 
   final backend = FakeBackend(withData: withData);
   if (loggedIn) backend.token = 'token';
+  backend.profileError = startupError;
   SharedPreferences.setMockInitialValues({});
   final prefs = await SharedPreferences.getInstance();
 
@@ -163,6 +166,26 @@ void main() {
     expect(backend.calls.where((c) => c == 'login'), hasLength(2));
     expect(find.text('Balance disponible'), findsOneWidget);
     expect(find.text(r'$141.50'), findsOneWidget);
+  });
+
+  testWidgets('keeps the session when the server fails at startup', (
+    tester,
+  ) async {
+    final backend = await pumpApp(
+      tester,
+      startupError: const ApiException(
+        'El servidor no está disponible ahora. Intenta de nuevo en un momento.',
+        statusCode: 503,
+      ),
+    );
+    expect(find.textContaining('no está disponible'), findsOneWidget);
+    expect(find.text('Comenzar'), findsNothing, reason: 'not sent to login');
+    expect(backend.calls, isNot(contains('logout')));
+
+    backend.profileError = null;
+    await tester.tap(find.text('Reintentar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Balance disponible'), findsOneWidget);
   });
 
   testWidgets('the welcome page shrinks Michi to fit instead of scrolling', (
@@ -460,6 +483,43 @@ void main() {
     await tester.pumpAndSettle();
     expect(backend.transactions, hasLength(count));
     expect(find.text('Guardar gasto'), findsOneWidget, reason: 'still editing');
+  });
+
+  testWidgets('a movement that fails to save says why inside the form', (
+    tester,
+  ) async {
+    final backend = await pumpApp(
+      tester,
+      scan: const ScanDraft(
+        source: ScanSource.receiptText,
+        amount: 7.25,
+        merchant: 'Cafetería',
+      ),
+    );
+    backend.saveError = const ApiException(
+      'Sin conexión. Revisa tu Internet e intenta de nuevo.',
+    );
+    final count = backend.transactions.length;
+    await tester.tap(find.byTooltip('Registrar movimiento'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Escanear factura o ticket'));
+    await tester.pumpAndSettle();
+    await scrollTo(tester, find.text('Guardar gasto'));
+    await tester.tap(find.text('Guardar gasto'));
+    await tester.pumpAndSettle();
+
+    final error = find.text(
+      'Sin conexión. Revisa tu Internet e intenta de nuevo.',
+    );
+    expect(error, findsOneWidget);
+    expect(error.hitTestable(), findsOneWidget, reason: 'not under the sheet');
+    expect(backend.transactions, hasLength(count));
+
+    backend.saveError = null;
+    await scrollTo(tester, find.text('Guardar gasto'));
+    await tester.tap(find.text('Guardar gasto'));
+    await tester.pumpAndSettle();
+    expect(backend.transactions, hasLength(count + 1));
   });
 
   testWidgets('an invoice QR without amount asks for it', (tester) async {

@@ -53,6 +53,12 @@ class FakeBackend {
   /// The signed-in account's password.
   String password = 'daniela123';
 
+  /// When set, reading the profile fails with it (server down, no network).
+  ApiException? profileError;
+
+  /// When set, saving a movement fails with it.
+  ApiException? saveError;
+
   /// The user's own categories (the system ones are [food] and [salary]).
   final customCategories = <Category>[];
 
@@ -166,6 +172,16 @@ class FakeAuthGateway implements AuthGateway {
   @override
   Future<String?> freshAccessToken() async => token;
 
+  /// What a forced refresh gives: a new token, or null (session revoked).
+  String? Function()? onRefresh;
+  int refreshes = 0;
+
+  @override
+  Future<String?> refreshAccessToken() async {
+    refreshes++;
+    return token = onRefresh?.call();
+  }
+
   @override
   Future<void> signIn({
     required String email,
@@ -226,6 +242,7 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<UserProfile> profile() async {
+    if (backend.profileError != null) throw backend.profileError!;
     if (backend.token == null) {
       throw const ApiException('Unauthorized', statusCode: 401);
     }
@@ -546,6 +563,7 @@ class FakeFinanceRepository implements FinanceRepository {
     String? paymentMethodId,
     String? reference,
   }) async {
+    if (backend.saveError != null) throw backend.saveError!;
     final tx = Transaction(
       id: 'new${backend.transactions.length}',
       title: title,

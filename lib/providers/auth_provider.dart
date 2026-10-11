@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/auth/auth_gateway.dart';
+import '../core/errors/api_exception.dart';
 import '../core/network/api_client.dart';
 import '../models/user_profile.dart';
 import '../repositories/auth_repository.dart';
@@ -18,6 +19,21 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 final currentUserIdProvider = Provider<String?>((ref) {
   return ref.watch(authControllerProvider.select((auth) => auth.value?.id));
 });
+
+/// Why the saved session couldn't be opened at startup (no connection, the
+/// server waking up or failing). The session is kept: the splash offers to
+/// retry instead of sending the user back to the login.
+final sessionRestoreErrorProvider =
+    NotifierProvider<SessionRestoreError, ApiException?>(
+      SessionRestoreError.new,
+    );
+
+class SessionRestoreError extends Notifier<ApiException?> {
+  @override
+  ApiException? build() => null;
+
+  void set(ApiException? error) => state = error;
+}
 
 final authControllerProvider =
     NotifierProvider<AuthController, AsyncValue<UserProfile?>>(
@@ -49,11 +65,21 @@ class AuthController extends Notifier<AsyncValue<UserProfile?>> {
       await ref
           .read(themeControllerProvider.notifier)
           .syncFromProfile(user.darkMode);
-    } catch (error, stackTrace) {
+    } catch (error) {
+      if (error is ApiException && error.statusCode != 401) {
+        // Still loading (the splash), now with the reason and a retry.
+        ref.read(sessionRestoreErrorProvider.notifier).set(error);
+        return;
+      }
       await _repo.logout();
-      state = AsyncError(error, stackTrace);
       state = const AsyncData(null);
     }
+  }
+
+  /// Tries the saved session again from the splash.
+  Future<void> retryRestore() async {
+    ref.read(sessionRestoreErrorProvider.notifier).set(null);
+    await load();
   }
 
   Future<void> login(String email, String password) async {
@@ -97,6 +123,7 @@ class AuthController extends Notifier<AsyncValue<UserProfile?>> {
       _repo.changePassword(current: current, next: next);
 
   Future<void> logout() async {
+    ref.read(sessionRestoreErrorProvider.notifier).set(null);
     await _repo.logout();
     state = const AsyncData(null);
   }

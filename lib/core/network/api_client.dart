@@ -49,7 +49,7 @@ class ApiClient {
           }
           handler.next(response);
         },
-        onError: (error, handler) {
+        onError: (error, handler) async {
           // No connection: answer a GET with its last saved result.
           final user = tokenSubject(_token);
           final cached =
@@ -71,12 +71,29 @@ class ApiClient {
             );
             return;
           }
-          final hadToken =
-              error.requestOptions.headers['Authorization'] != null;
-          if (error.response?.statusCode == 401 && hadToken) {
-            // Expired or revoked token: drop the session instead of failing
-            // every screen with "Unauthorized".
-            clearToken();
+          if (error.response?.statusCode == 401) {
+            final options = error.requestOptions;
+            // Once: refresh the session and repeat the request (a token
+            // that expired in flight, or a clock off by a few seconds).
+            if (options.extra[_retriedKey] != true && _token != null) {
+              try {
+                if (await _auth.refreshAccessToken() != null) {
+                  options.extra[_retriedKey] = true;
+                  handler.resolve(await dio.fetch<dynamic>(options));
+                  return;
+                }
+              } on DioException catch (retryError) {
+                handler.reject(retryError);
+                return;
+              } catch (_) {
+                // Supabase unreachable: keep the session, fail this request.
+                handler.reject(error);
+                return;
+              }
+            }
+            // Revoked, expired for good or deleted: drop the session instead
+            // of failing every screen with "Unauthorized".
+            await clearToken();
             onUnauthorized?.call();
           }
           handler.reject(error);
@@ -84,6 +101,8 @@ class ApiClient {
       ),
     );
   }
+
+  static const _retriedKey = 'authRetried';
 
   final AuthGateway _auth;
   final ResponseCache? _cache;
@@ -111,15 +130,25 @@ class ApiClient {
   ApiException parseError(Object error) {
     if (error is DioException) {
       final data = error.response?.data;
-      String message = 'No se pudo conectar con la API.';
+      final status = error.response?.statusCode;
+      var message = switch (error.type) {
+        DioExceptionType.receiveTimeout =>
+          'El servidor está tardando en responder. Intenta de nuevo en un momento.',
+        DioExceptionType.connectionError ||
+        DioExceptionType.connectionTimeout ||
+        DioExceptionType.sendTimeout =>
+          'Sin conexión. Revisa tu Internet e intenta de nuevo.',
+        _ when status != null && status >= 500 =>
+          'El servidor no está disponible ahora. Intenta de nuevo en un momento.',
+        _ => 'No se pudo conectar con la API.',
+      };
+      // The API's own message (Spanish, from Nest) when it sent one.
       if (data is Map<String, dynamic>) {
         final raw = data['message'];
         if (raw is List) message = raw.join('\n');
         if (raw is String) message = raw;
-      } else if (error.message != null) {
-        message = error.message!;
       }
-      return ApiException(message, statusCode: error.response?.statusCode);
+      return ApiException(message, statusCode: status);
     }
     return ApiException(error.toString());
   }
