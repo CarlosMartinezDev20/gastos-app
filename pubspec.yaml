@@ -138,7 +138,7 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
-# App icons (Android, iOS, web) from the Finomiau kit in branding/.
+# App icons (Android, iOS, web) from the Miaunero kit in branding/.
 # Regenerate: python3 branding/build_kit.py && branding/render_kit.sh && dart run flutter_launcher_icons
 # && cp branding/png/favicon-32.png web/favicon.png  (the favicon uses the small cut with bigger eyes).
 flutter_launcher_icons:

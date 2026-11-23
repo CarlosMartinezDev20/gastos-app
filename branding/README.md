@@ -1,21 +1,21 @@
-# Finomiau — logo kit
+# Miaunero — logo kit
 
 Una ficha (entre moneda y tarjeta, la superelipse de los íconos de iOS) que se vuelve cara de gato con lo mínimo:
-dos orejas en las esquinas y dos ojos redondos. El wordmark es «finomiau» en minúsculas pesadas y compactas, con el
-símbolo como la «o». Guía visual: `guia.html` / `guia.png`.
+dos orejas en las esquinas y dos ojos redondos. El wordmark es «miaunero» en minúsculas pesadas y compactas, con el
+símbolo como la «o» final. Guía visual: `guia.html` / `guia.png`.
 
 ## Archivos
 
 | Archivo | Uso |
 |---|---|
-| `svg/finomiau-wordmark-on-dark.svg` | Logo principal sobre fondos oscuros (texto blanco, «o» lima) |
-| `svg/finomiau-wordmark-on-light.svg` | Logo principal sobre blanco / gris claro (todo tinta) |
-| `svg/finomiau-wordmark-black.svg`, `-white.svg` | Una tinta (impresión, sellos, fondos de color) |
-| `svg/finomiau-symbol-{lime,ink,black,white}.svg` | Símbolo solo, ≥ 40 px |
-| `svg/finomiau-symbol-small-*.svg` | Corte para tamaños chicos (ojos 1,6× más grandes), < 40 px |
-| `svg/finomiau-app-icon.svg` | Ícono de app a sangre (iOS / tiendas aplican su máscara) |
-| `svg/finomiau-app-icon-rounded.svg` | Ícono con esquinas iOS, para presentaciones y README |
-| `svg/finomiau-favicon.svg` | Favicon (corte small, sin brillo) |
+| `svg/miaunero-wordmark-on-dark.svg` | Logo principal sobre fondos oscuros (texto blanco, «o» lima) |
+| `svg/miaunero-wordmark-on-light.svg` | Logo principal sobre blanco / gris claro (todo tinta) |
+| `svg/miaunero-wordmark-black.svg`, `-white.svg` | Una tinta (impresión, sellos, fondos de color) |
+| `svg/miaunero-symbol-{lime,ink,black,white}.svg` | Símbolo solo, ≥ 40 px |
+| `svg/miaunero-symbol-small-*.svg` | Corte para tamaños chicos (ojos 1,6× más grandes), < 40 px |
+| `svg/miaunero-app-icon.svg` | Ícono de app a sangre (iOS / tiendas aplican su máscara) |
+| `svg/miaunero-app-icon-rounded.svg` | Ícono con esquinas iOS, para presentaciones y README |
+| `svg/miaunero-favicon.svg` | Favicon (corte small, sin brillo) |
 | `svg/android-adaptive-*.svg` | Capas del ícono adaptativo de Android (fondo, frente, monocromo) |
 | `svg/ios-dark.svg`, `ios-tinted.svg` | Apariencias oscura y tintada de iOS 18 |
 | `png/` | Los mismos en PNG: `app-icon-1024`, `play-store-512`, `favicon-{16,32,48,180,192,512}`, `favicon.ico`, símbolos a 512/128, wordmarks a 1200 de ancho |
@@ -30,7 +30,7 @@ Wordmark y símbolo son trazos (sin texto vivo, sin efectos). El volumen, brillo
   con una guía física.
 - **Espacio libre**: alrededor del wordmark, la mitad de la altura de la cara de Michi (sin orejas); alrededor del
   símbolo, ¼ de su ancho.
-- **Tamaño mínimo**: wordmark 24 px de alto (≈ 133 px de ancho), 30 mm de ancho impreso; más chico, solo el ícono.
+- **Tamaño mínimo**: wordmark 24 px de alto (≈ 140 px de ancho), 30 mm de ancho impreso; más chico, solo el ícono.
   Símbolo: 16 px con el corte small.
 - **No**: estirar, rotar, recolorear, añadir sombras/contornos/degradados al logo plano, reescribir el nombre con la
   fuente, cambiar ojos u orejas, ni usar el símbolo grande debajo de 40 px.

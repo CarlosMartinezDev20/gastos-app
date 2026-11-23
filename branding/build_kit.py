@@ -1,7 +1,7 @@
-"""Builds the Finomiau logo kit (SVG masters) in branding/svg/.
+"""Builds the Miaunero logo kit (SVG masters) in branding/svg/.
 
 The mark: a "ficha" (an iOS-like superellipse, between a coin and a card) whose top corners rise into
-ears, with two round eyes cut out. The wordmark is "finomiau" in Inter Display Black, set tight, with
+ears, with two round eyes cut out. The wordmark is "miaunero" in Inter Display Black, set tight, with
 the mark as the «o». Inside the wordmark and at 40 px or less the "small" cut is used (eyes 1.6x larger).
 
     python3 -m pip install fonttools   # once, in any venv
@@ -118,7 +118,7 @@ def lit_mark(d, width, effects=True):
     return f'<g {placed(width)}>{fx}<path d="{d}" fill="url(#lime)"/><path d="{d}" fill="url(#sheen)"/></g>'
 
 
-def svg(w, h, body, title="Finomiau"):
+def svg(w, h, body, title="Miaunero"):
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {f(w)} {f(h)}" width="{f(w)}" height="{f(h)}">'
             f'<title>{title}</title>{body}</svg>\n')
 
@@ -180,20 +180,24 @@ def gbounds(name):
     return bp.bounds
 
 
-def wordmark(ink, mark_color, size=160, tracking=-0.03):
+def wordmark(ink, mark_color, size=160, tracking=-0.03, text="miaunero", face=None):
+    """face: index of the «o» drawn as the mark (default: the first o)."""
+    face = text.index("o") if face is None else face
     sc = size / UPM
     pen = SVGPathPen(gs)
     x, base, prev = 0.0, 0.0, None
+    if face != 0:
+        x = -gbounds(cmap[ord(text[0])])[0] * sc  # first letter flush left
     top, bottom = 0.0, 0.0
     ob = gbounds(cmap[ord("o")])
     o_h = (ob[3] - ob[1]) * sc
     sym = ""
-    for ch in "finomiau":
+    for idx, ch in enumerate(text):
         name = cmap[ord(ch)]
         if prev == "f" and ch == "i":
             x += 0.035 * size  # keep the f's hook off the i's dot
         prev = ch
-        if ch == "o":
+        if idx == face:
             bw, bh = BODY[2] - BODY[0], BODY[3] - BODY[1]
             s = o_h * 1.02 / bh
             lsb = ob[0] * sc
@@ -202,6 +206,7 @@ def wordmark(ink, mark_color, size=160, tracking=-0.03):
             sym = f'<path fill="{mark_color}" transform="translate({f(tx)},{f(ty)}) scale({f(s)})" d="{mark(True)}"/>'
             top = min(top, ty + (EAR_TOP + 5.5) * s)
             bottom = max(bottom, ty + BODY[3] * s)
+            right = tx + BODY[2] * s
             adv = 2 * lsb + bw * s
         else:
             gs[name].draw(TransformPen(pen, (sc, 0, 0, -sc, x, base)))
@@ -217,26 +222,26 @@ def wordmark(ink, mark_color, size=160, tracking=-0.03):
 
 
 FILES = {
-    "finomiau-app-icon.svg": app_icon(rounded=False),
-    "finomiau-app-icon-rounded.svg": app_icon(rounded=True),
-    "finomiau-favicon.svg": favicon(),
+    "miaunero-app-icon.svg": app_icon(rounded=False),
+    "miaunero-app-icon-rounded.svg": app_icon(rounded=True),
+    "miaunero-favicon.svg": favicon(),
     "android-adaptive-background.svg": adaptive_background(),
     "android-adaptive-foreground.svg": adaptive_foreground(),
     "android-adaptive-monochrome.svg": adaptive_monochrome(),
     "ios-dark.svg": ios_dark(),
     "ios-tinted.svg": ios_tinted(),
-    "finomiau-symbol-lime.svg": symbol(LIME),
-    "finomiau-symbol-ink.svg": symbol(INK),
-    "finomiau-symbol-black.svg": symbol(BLACK),
-    "finomiau-symbol-white.svg": symbol(WHITE),
-    "finomiau-symbol-small-lime.svg": symbol(LIME, True),
-    "finomiau-symbol-small-ink.svg": symbol(INK, True),
-    "finomiau-symbol-small-black.svg": symbol(BLACK, True),
-    "finomiau-symbol-small-white.svg": symbol(WHITE, True),
-    "finomiau-wordmark-on-dark.svg": wordmark("#F7F7F8", LIME),
-    "finomiau-wordmark-on-light.svg": wordmark(INK, INK),
-    "finomiau-wordmark-black.svg": wordmark(BLACK, BLACK),
-    "finomiau-wordmark-white.svg": wordmark(WHITE, WHITE),
+    "miaunero-symbol-lime.svg": symbol(LIME),
+    "miaunero-symbol-ink.svg": symbol(INK),
+    "miaunero-symbol-black.svg": symbol(BLACK),
+    "miaunero-symbol-white.svg": symbol(WHITE),
+    "miaunero-symbol-small-lime.svg": symbol(LIME, True),
+    "miaunero-symbol-small-ink.svg": symbol(INK, True),
+    "miaunero-symbol-small-black.svg": symbol(BLACK, True),
+    "miaunero-symbol-small-white.svg": symbol(WHITE, True),
+    "miaunero-wordmark-on-dark.svg": wordmark("#F7F7F8", LIME),
+    "miaunero-wordmark-on-light.svg": wordmark(INK, INK),
+    "miaunero-wordmark-black.svg": wordmark(BLACK, BLACK),
+    "miaunero-wordmark-white.svg": wordmark(WHITE, WHITE),
 }
 
 if __name__ == "__main__":
