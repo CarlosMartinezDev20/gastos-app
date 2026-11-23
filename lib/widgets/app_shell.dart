@@ -1,7 +1,7 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -238,8 +238,10 @@ class AppDock extends StatelessWidget {
 
     // Liquid-glass-like: the page behind is blurred and made more vivid
     // through a translucent fill with a light rim. On the web (costly blur)
-    // and with high contrast it's a solid bar instead.
-    final glass = false; // EXPERIMENT
+    // and with high contrast it's a solid bar instead. Off since the solid-dock
+    // experiment of Nov 2026: build with --dart-define=DOCK_GLASS=true to
+    // compare.
+    final glass = _dockGlass && !kIsWeb && !MediaQuery.highContrastOf(context);
     final shape = StadiumBorder(
       side: glass ? BorderSide.none : BorderSide(color: palette.hairline),
     );
@@ -305,6 +307,8 @@ class AppDock extends StatelessWidget {
 
   /// Blur plus extra saturation, so colors behind the glass glow through
   /// instead of turning grey.
+  static const _dockGlass = bool.fromEnvironment('DOCK_GLASS');
+
   static final _glassFilter = ImageFilter.compose(
     outer: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
     inner: _saturate(1.7),
