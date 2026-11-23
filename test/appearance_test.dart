@@ -1,9 +1,11 @@
 import 'package:appgastos/core/theme/app_accent.dart';
 import 'package:appgastos/core/theme/app_palette.dart';
 import 'package:appgastos/core/theme/app_theme.dart';
+import 'package:appgastos/core/utils/home_layout.dart';
 import 'package:appgastos/core/utils/phone_widget.dart';
 import 'package:appgastos/models/user_profile.dart';
 import 'package:appgastos/providers/theme_provider.dart';
+import 'package:appgastos/widgets/home_cards.dart';
 import 'package:appgastos/widgets/mascot.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -87,6 +89,40 @@ void main() {
       });
       expect(old.themeMode, 'DARK');
       expect(old.accent, 'LIME');
+    });
+  });
+
+  group('Inicio', () {
+    test('income starts in lime and spending in ink', () {
+      expect(defaultStyle(HomeWidgetType.income), HomeWidgetStyle.accent);
+      expect(defaultStyle(HomeWidgetType.spending), HomeWidgetStyle.ink);
+      expect(defaultStyle(HomeWidgetType.goals), HomeWidgetStyle.card);
+    });
+
+    testWidgets('the income tile keeps lime in another accent', (tester) async {
+      late HomeTone income, other;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(accent: AppAccent.violeta),
+          home: Builder(
+            builder: (context) {
+              income = HomeTone.of(
+                context,
+                HomeWidgetStyle.accent,
+                type: HomeWidgetType.income,
+              );
+              other = HomeTone.of(
+                context,
+                HomeWidgetStyle.accent,
+                type: HomeWidgetType.goals,
+              );
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+      expect(income.background, AppAccent.lima.accent);
+      expect(other.background, AppAccent.violeta.accent);
     });
   });
 

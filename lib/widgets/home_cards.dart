@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../core/theme/app_accent.dart';
 import '../core/theme/app_palette.dart';
 import '../core/utils/finance_insights.dart';
 import '../core/utils/home_layout.dart';
@@ -46,7 +47,13 @@ class HomeTone {
     this.gradient,
   });
 
-  factory HomeTone.of(BuildContext context, HomeWidgetStyle style) {
+  /// [type] is the widget wearing the style: income keeps the brand's lime
+  /// in every theme accent, like income amounts stay green.
+  factory HomeTone.of(
+    BuildContext context,
+    HomeWidgetStyle style, {
+    HomeWidgetType? type,
+  }) {
     final palette = context.palette;
     final scheme = Theme.of(context).colorScheme;
     HomeTone tinted(Color bg, Color fg, {Gradient? gradient}) => HomeTone(
@@ -74,6 +81,10 @@ class HomeTone {
         subtle: palette.onInk.withValues(alpha: .1),
         action: palette.accent,
         onAction: palette.onAccent,
+      ),
+      HomeWidgetStyle.accent when type == HomeWidgetType.income => tinted(
+        AppAccent.lima.accent,
+        AppAccent.lima.onAccent,
       ),
       HomeWidgetStyle.accent => tinted(palette.accent, palette.onAccent),
       HomeWidgetStyle.mint => tinted(palette.mint, palette.onMint),
@@ -114,7 +125,7 @@ class HomeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tone = HomeTone.of(context, config.style);
+    final tone = HomeTone.of(context, config.style, type: config.type);
     final compact = config.compact;
     return switch (config.type) {
       HomeWidgetType.balance => BalanceCard(data: data, tone: tone),

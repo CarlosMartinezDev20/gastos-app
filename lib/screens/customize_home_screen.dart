@@ -233,7 +233,7 @@ class _StyleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tone = HomeTone.of(context, config.style);
+    final tone = HomeTone.of(context, config.style, type: config.type);
     return Container(
       width: 34,
       height: 34,
@@ -390,6 +390,7 @@ class _HomeWidgetSheet extends ConsumerWidget {
                 for (final style in type.styles)
                   _Swatch(
                     style: style,
+                    type: type,
                     selected: style == config.style,
                     onTap: () => controller.edit(type, style: style),
                   ),
@@ -422,17 +423,19 @@ class _HomeWidgetSheet extends ConsumerWidget {
 class _Swatch extends StatelessWidget {
   const _Swatch({
     required this.style,
+    required this.type,
     required this.selected,
     required this.onTap,
   });
 
   final HomeWidgetStyle style;
+  final HomeWidgetType type;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final tone = HomeTone.of(context, style);
+    final tone = HomeTone.of(context, style, type: type);
     final ring = Theme.of(context).colorScheme.onSurface;
     return Semantics(
       selected: selected,

@@ -88,7 +88,7 @@ enum HomeWidgetSize {
 enum HomeWidgetStyle {
   card('Básico'),
   ink('Negro'),
-  accent('Lima'),
+  accent('Acento'),
   mint('Menta'),
   blush('Rosa'),
   lilac('Lila'),
@@ -146,10 +146,12 @@ class HomeWidgetConfig {
   int get hashCode => Object.hash(type, size, style);
 }
 
-/// Plain cards by default, like iOS widgets: color is something people
-/// choose for one widget (long press), not the whole board shouting.
+/// Plain cards by default, like iOS widgets, except the two totals at the top:
+/// income in lime and spending in ink, so the board has color from the start.
+/// The rest is something people choose per widget (long press).
 HomeWidgetStyle defaultStyle(HomeWidgetType type) => switch (type) {
-  HomeWidgetType.quickAdd => HomeWidgetStyle.ink,
+  HomeWidgetType.income => HomeWidgetStyle.accent,
+  HomeWidgetType.spending || HomeWidgetType.quickAdd => HomeWidgetStyle.ink,
   _ => HomeWidgetStyle.card,
 };
 
