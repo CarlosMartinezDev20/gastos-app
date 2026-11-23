@@ -5,7 +5,7 @@
     <!-- Payment reminders: reschedule them after a reboot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <application
-        android:label="appgastos"
+        android:label="Finomiau"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

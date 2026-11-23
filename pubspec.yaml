@@ -66,6 +66,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -136,3 +137,26 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# App icons (Android, iOS, web) from the Finomiau kit in branding/.
+# Regenerate: python3 branding/build_kit.py && branding/render_kit.sh && dart run flutter_launcher_icons
+# && cp branding/png/favicon-32.png web/favicon.png  (the favicon uses the small cut with bigger eyes).
+flutter_launcher_icons:
+  image_path: "branding/png/app-icon-1024.png"
+  image_path_android: "branding/png/app-icon-rounded-1024.png" # legacy icon (API 24-25)
+  android: "ic_launcher"
+  min_sdk_android: 24
+  adaptive_icon_background: "branding/png/android-adaptive-background.png"
+  adaptive_icon_foreground: "branding/png/android-adaptive-foreground.png"
+  adaptive_icon_monochrome: "branding/png/android-adaptive-monochrome.png"
+  adaptive_icon_foreground_inset: 0 # the layers are already sized to the 66 dp safe zone
+  ios: true
+  remove_alpha_ios: true
+  image_path_ios_dark_transparent: "branding/png/ios-dark-1024.png"
+  image_path_ios_tinted_grayscale: "branding/png/ios-tinted-1024.png"
+  desaturate_tinted_to_grayscale_ios: true
+  web:
+    generate: true
+    image_path: "branding/png/app-icon-1024.png"
+    background_color: "#1C1C1E"
+    theme_color: "#1C1C1E"

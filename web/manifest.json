@@ -1,11 +1,11 @@
 {
-    "name": "appgastos",
-    "short_name": "appgastos",
+    "name": "Finomiau",
+    "short_name": "Finomiau",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#1C1C1E",
+    "theme_color": "#1C1C1E",
+    "description": "Registra y controla tus gastos",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
