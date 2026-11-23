@@ -3,6 +3,7 @@ import 'package:appgastos/core/utils/mascot_insights.dart';
 import 'package:appgastos/models/budget.dart';
 import 'package:appgastos/models/category.dart';
 import 'package:appgastos/models/metrics.dart';
+import 'package:appgastos/models/savings_goal.dart';
 import 'package:appgastos/models/transaction.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -36,6 +37,26 @@ void main() {
     expect(summary.income, 300);
     expect(summary.spent, 20);
     expect(summary.saved, 50);
+  });
+
+  test('month to date compares with the previous month at the same day', () {
+    final month = monthToDate([
+      tx(300, DateTime(2026, 10, 1), category: salary),
+      tx(30, DateTime(2026, 10, 15, 20)),
+      tx(20, DateTime(2026, 9, 30, 23)), // last month, after its day 15
+      tx(40, DateTime(2026, 9, 15, 23)), // last month, up to its day 15
+    ], now);
+    expect(month.current.income, 300);
+    expect(month.current.spent, 30);
+    expect(month.previous.spent, 40);
+
+    // March 31 compares with all of February.
+    final march = monthToDate([
+      tx(10, DateTime(2026, 2, 28, 12)),
+      tx(5, DateTime(2026, 3, 1)),
+    ], DateTime(2026, 3, 31));
+    expect(march.previous.spent, 10);
+    expect(march.current.spent, 5);
   });
 
   test('last seven days ends today and ignores income and savings', () {
@@ -104,6 +125,69 @@ void main() {
       expect(mood(month(100, 50, 20)), MascotMood.excited);
       expect(mood(month(100, 60, 0)), MascotMood.happy);
       expect(mood(month(100, 90, 0)), MascotMood.calm);
+      // A quiet month isn't "0% of your income".
+      expect(mood(month(0, 0, 0)), MascotMood.calm);
+      expect(
+        homeTip(
+          month: month(0, 0, 0),
+          balance: 100,
+          hasActivity: true,
+          goalCount: 1,
+        ).messages.join(),
+        isNot(contains('%')),
+      );
+    });
+
+    test('goals that are late or behind join the home messages', () {
+      SavingsGoal goal(String name, DateTime date) => SavingsGoal(
+        id: name,
+        name: name,
+        targetAmount: 600,
+        savedAmount: 0,
+        icon: 'x',
+        bgColor: '',
+        iconColor: '',
+        progressPercent: 0,
+        targetDate: date,
+      );
+      final now = DateTime(2026, 10, 24);
+      final contribution = Transaction(
+        id: 't',
+        title: 'Ahorro: Viaje',
+        amount: 50,
+        type: TransactionType.expense,
+        date: DateTime(2026, 10, 1),
+        category: const Category(
+          id: 's',
+          name: 'Ahorro',
+          icon: 'x',
+          type: TransactionType.expense,
+          isDefault: true,
+        ),
+        goalId: 'Viaje',
+      );
+      final alerts = goalMessages(
+        [
+          goal('Viaje', DateTime(2027, 4, 30)), // 50/month, needs 100
+          goal('Laptop', DateTime(2026, 10, 1)), // date passed
+          goal('Moto', DateTime(2027, 4, 30)), // no contributions yet
+        ],
+        [contribution],
+        now: now,
+      );
+      expect(alerts, [
+        r'Para llegar a "Viaje" a tiempo aparta $100.00 al mes.',
+        'Se pasó la fecha de "Laptop". ¿Le ponemos una nueva?',
+      ]);
+      final tip = homeTip(
+        month: month(100, 60, 0),
+        balance: 100,
+        hasActivity: true,
+        goalCount: 3,
+        goalAlerts: alerts,
+      );
+      expect(tip.mood, MascotMood.happy);
+      expect(tip.messages.skip(1).take(2), alerts);
     });
 
     test('analysis names the biggest category', () {
@@ -174,5 +258,18 @@ void main() {
       expect(analysis.mood, MascotMood.worried);
       expect(analysis.messages.first, contains('Te pasaste'));
     });
+  });
+
+  test('niceAxisStep picks round steps that reach the top in about 3', () {
+    expect(niceAxisStep(0), 1);
+    expect(niceAxisStep(73.17), 25);
+    expect(niceAxisStep(296), 100);
+    expect(niceAxisStep(30), 10);
+    expect(niceAxisStep(5.4), 2);
+    expect(niceAxisStep(1200), 500);
+    for (final max in [3.0, 47.0, 180.0, 999.0, 12345.0]) {
+      final step = niceAxisStep(max);
+      expect(max / step, inInclusiveRange(1.2, 3.0001));
+    }
   });
 }

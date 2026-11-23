@@ -1,10 +1,10 @@
+import '../widgets/money_privacy.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/app_palette.dart';
-import '../core/utils/formatters.dart';
 import '../models/budget.dart';
 import '../models/category.dart';
 import '../providers/finance_providers.dart';
@@ -204,6 +204,7 @@ class _BudgetSheetState extends ConsumerState<BudgetSheet> {
                 builder: (context, focusNode) => TextFormField(
                   controller: _amount,
                   focusNode: focusNode,
+                  obscureText: MoneyPrivacyScope.hiddenOf(context),
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
@@ -237,14 +238,14 @@ class _BudgetSheetState extends ConsumerState<BudgetSheet> {
                 builder: (context, _) => Text(
                   _percentMode
                       ? income > 0
-                            ? '= ${Formatters.compactMoney(_limitFrom(income))} '
+                            ? '= ${context.money(_limitFrom(income))} '
                                   'al mes, de tus '
-                                  '${Formatters.compactMoney(income)} de ingreso.'
+                                  '${context.money(income)} de ingreso.'
                             : 'Configura tus ingresos en la calculadora para '
                                   'usar porcentajes.'
                       : income > 0 && (_typed ?? 0) > 0
                       ? 'Es el ${((_typed! / income) * 100).toStringAsFixed(1)}% '
-                            'de tus ${Formatters.compactMoney(income)} al mes.'
+                            'de tus ${context.money(income)} al mes.'
                       : '',
                   style: TextStyle(color: palette.muted),
                 ),

@@ -1,3 +1,7 @@
+import 'package:appgastos/services/transaction_draft_store.dart';
+import 'dart:async';
+
+import 'package:appgastos/services/biometric_auth.dart';
 import 'package:appgastos/core/auth/auth_gateway.dart';
 import 'package:appgastos/core/errors/api_exception.dart';
 import 'package:appgastos/core/utils/phone_widget.dart';
@@ -7,7 +11,6 @@ import 'package:appgastos/core/utils/payment_reminders.dart';
 import 'package:appgastos/models/auth_session.dart';
 import 'package:appgastos/models/budget.dart';
 import 'package:appgastos/models/category.dart';
-import 'package:appgastos/models/dashboard.dart';
 import 'package:appgastos/models/metrics.dart';
 import 'package:appgastos/models/payment_method.dart';
 import 'package:appgastos/models/recurring.dart';
@@ -58,6 +61,18 @@ class FakeBackend {
 
   /// When set, saving a movement fails with it.
   ApiException? saveError;
+
+  /// When set, Supabase Auth calls (password reset) fail with it.
+  ApiException? authError;
+
+  /// The account's email isn't confirmed yet: signing in is refused.
+  bool unconfirmed = false;
+
+  /// Auth links "opened" in the app (reset, confirmation).
+  final links = StreamController<AuthLinkEvent>.broadcast();
+
+  /// The app's session, when the test set one up.
+  FakeAuthGateway? gateway;
 
   /// The user's own categories (the system ones are [food] and [salary]).
   final customCategories = <Category>[];
@@ -204,6 +219,18 @@ class FakeAuthGateway implements AuthGateway {
 
   @override
   Future<void> signOut() async => token = null;
+
+  @override
+  Future<void> sendPasswordReset(String email) async {}
+
+  @override
+  Future<void> setNewPassword(String password) async {}
+
+  @override
+  Future<void> resendConfirmation(String email) async {}
+
+  @override
+  Stream<AuthLinkEvent> get linkEvents => const Stream.empty();
 }
 
 class FakeAuthRepository implements AuthRepository {
@@ -217,6 +244,7 @@ class FakeAuthRepository implements AuthRepository {
     required String password,
   }) async {
     backend.calls.add('login');
+    if (backend.unconfirmed) throw EmailNotConfirmedException(email);
     if (password != backend.password) {
       throw const ApiException('Credenciales inválidas', statusCode: 401);
     }
@@ -250,8 +278,19 @@ class FakeAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<UserProfile> updateProfile({bool? darkMode, String? name}) async {
-    backend.user = backend.user.copyWith(darkMode: darkMode, name: name);
+  Future<UserProfile> updateProfile({
+    bool? darkMode,
+    String? name,
+    String? themeMode,
+    String? accent,
+  }) async {
+    backend.user = backend.user.copyWith(
+      // Like the API: darkMode mirrors themeMode.
+      darkMode: themeMode == null ? darkMode : themeMode == 'DARK',
+      name: name,
+      themeMode: themeMode,
+      accent: accent,
+    );
     return backend.user;
   }
 
@@ -287,20 +326,34 @@ class FakeAuthRepository implements AuthRepository {
     backend.calls.add('logout');
     backend.token = null;
   }
+
+  @override
+  Future<void> sendPasswordReset(String email) async {
+    if (backend.authError != null) throw backend.authError!;
+    backend.calls.add('reset:$email');
+  }
+
+  @override
+  Future<void> setNewPassword(String password) async {
+    backend.calls.add('newPassword');
+    backend.password = password;
+    backend.token = 'token';
+    backend.gateway?.token = 'token';
+  }
+
+  @override
+  Future<void> resendConfirmation(String email) async {
+    backend.calls.add('resend:$email');
+  }
+
+  @override
+  Stream<AuthLinkEvent> get linkEvents => backend.links.stream;
 }
 
 class FakeFinanceRepository implements FinanceRepository {
   FakeFinanceRepository(this.backend);
 
   final FakeBackend backend;
-
-  @override
-  Future<DashboardData> dashboard() async => DashboardData(
-    user: backend.user,
-    balance: await balance(),
-    goals: await savingsGoals(),
-    transactions: await transactions(),
-  );
 
   @override
   Future<List<Category>> categories() async => [
@@ -518,6 +571,8 @@ class FakeFinanceRepository implements FinanceRepository {
     final all = filterTransactions(
       backend.transactions,
       query: query.search,
+      categoryId: query.categoryId,
+      paymentMethodId: query.paymentMethodId,
       type: query.type,
       from: query.from,
       to: query.to,
@@ -753,6 +808,7 @@ class FakeFinanceRepository implements FinanceRepository {
     required String icon,
     required String bgColor,
     required String iconColor,
+    DateTime? targetDate,
   }) async {
     final goal = SavingsGoal(
       id: 'g${backend.goals.length + 1}',
@@ -763,6 +819,7 @@ class FakeFinanceRepository implements FinanceRepository {
       bgColor: bgColor,
       iconColor: iconColor,
       progressPercent: 0,
+      targetDate: targetDate,
     );
     backend.goals.add(goal);
     return goal;
@@ -774,7 +831,22 @@ class FakeFinanceRepository implements FinanceRepository {
     required String name,
     required double targetAmount,
     required String icon,
-  }) async => throw UnimplementedError();
+    required DateTime? targetDate,
+  }) async {
+    final index = backend.goals.indexWhere((g) => g.id == id);
+    final old = backend.goals[index];
+    return backend.goals[index] = SavingsGoal(
+      id: id,
+      name: name,
+      targetAmount: targetAmount,
+      savedAmount: old.savedAmount,
+      icon: icon,
+      bgColor: old.bgColor,
+      iconColor: old.iconColor,
+      progressPercent: (old.savedAmount / targetAmount * 100).clamp(0, 100),
+      targetDate: targetDate,
+    );
+  }
 
   @override
   Future<void> deleteGoal(String id) async {
@@ -875,4 +947,39 @@ class FakePaymentReminderService implements PaymentReminderService {
 
   @override
   Future<void> cancelAll() async => scheduled = const [];
+}
+
+/// Fingerprint/face that passes when [pass] is true.
+class FakeBiometricAuth implements BiometricAuth {
+  FakeBiometricAuth({this.pass = true});
+
+  bool pass;
+  int prompts = 0;
+
+  @override
+  bool get supported => true;
+
+  @override
+  Future<bool> isAvailable() async => true;
+
+  @override
+  Future<bool> authenticate(String reason) async {
+    prompts++;
+    return pass;
+  }
+}
+
+class FakeTransactionDraftStore implements TransactionDraftStore {
+  final drafts = <String, Map<String, dynamic>>{};
+  @override
+  Future<Map<String, dynamic>?> read(String key) async => drafts[key];
+  @override
+  Future<void> write(String key, Map<String, dynamic> draft) async {
+    drafts[key] = Map.of(draft);
+  }
+
+  @override
+  Future<void> delete(String key) async {
+    drafts.remove(key);
+  }
 }

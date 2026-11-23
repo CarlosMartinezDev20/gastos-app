@@ -26,23 +26,33 @@ abstract final class Motion {
   static const stagger = Duration(milliseconds: 50);
   static const maxStaggered = 6;
 
-  /// Bottom sheets: in like a state change, out quicker. (With reduced
-  /// motion Flutter already runs route controllers 20× faster.)
+  /// Bottom sheets rise like iOS sheets: longer, fast at first and settling
+  /// softly ([sheetCurve]); out quicker. (With reduced motion Flutter
+  /// already runs route controllers 20× faster.)
   static const sheet = AnimationStyle(
-    duration: medium,
-    reverseDuration: fast,
-    curve: standard,
+    duration: Duration(milliseconds: 420),
+    reverseDuration: medium,
+    curve: sheetCurve,
     reverseCurve: exit,
   );
 
-  /// Entering and moving: fast start, gentle stop.
-  static const Curve standard = Curves.easeOutCubic;
+  /// The deceleration of iOS sheets and drawers.
+  static const Curve sheetCurve = Cubic(.32, .72, 0, 1);
 
-  /// Leaving: gentle start, fast end.
-  static const Curve exit = Curves.easeInCubic;
+  /// Entering and moving: a strong ease-out, so the motion starts the
+  /// instant the user acts and settles softly (the platform's easeOutCubic
+  /// is too weak to feel intentional).
+  static const Curve standard = Cubic(.23, 1, .32, 1);
 
-  /// A small playful overshoot, for selection and pop-ins only.
-  static const Curve spring = Curves.easeOutBack;
+  /// For animations played in reverse (route pops, an AnimatedSwitcher's
+  /// outgoing child, a ReverseAnimation): [standard] mirrored, so leaving
+  /// also starts fast. Never use it on a forward animation (that would be an
+  /// ease-in, which feels sluggish).
+  static const Curve exit = FlippedCurve(standard);
+
+  /// A slight overshoot (about 2%), for selection and pop-ins only: enough
+  /// to feel alive, not bouncy.
+  static const Curve spring = Cubic(.25, 1.25, .5, 1);
 
   /// Whether the user asked the system to reduce motion.
   static bool reduced(BuildContext context) =>

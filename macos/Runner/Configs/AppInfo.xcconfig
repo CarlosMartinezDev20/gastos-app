@@ -8,7 +8,7 @@
 PRODUCT_NAME = appgastos
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.appgastos
+PRODUCT_BUNDLE_IDENTIFIER = io.github.carlosmartinezdev20.appgastos
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.example. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 Carlos Martínez. All rights reserved.

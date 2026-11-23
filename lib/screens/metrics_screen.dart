@@ -1,3 +1,4 @@
+import '../widgets/money_privacy.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -20,19 +21,13 @@ import '../widgets/mascot.dart';
 import 'budgets_section.dart';
 import '../core/theme/motion.dart';
 
-// Paleta de colores para categorías (se rota cíclicamente)
-const _kCategoryColors = [
-  Color(0xFF67AD78),
-  Color(0xFF649DBD),
-  Color(0xFF9A86CF),
-  Color(0xFFC58F72),
-  Color(0xFFB87B98),
-  Color(0xFF6AADA2),
-  Color(0xFF8B91BD),
-  Color(0xFF96A36D),
-];
-
-Color _colorFor(int index) => _kCategoryColors[index % _kCategoryColors.length];
+/// Category bars in the app's ink, like the flow chart: the biggest
+/// category solid, the rest faded. The ranking and the icons say which is
+/// which, so a rainbow of hues would only add noise.
+Color _rankColor(BuildContext context, int index) {
+  final ink = Theme.of(context).colorScheme.onSurface;
+  return index == 0 ? ink : ink.withValues(alpha: .28);
+}
 
 class MetricsScreen extends ConsumerWidget {
   const MetricsScreen({super.key});
@@ -58,7 +53,6 @@ class MetricsScreen extends ConsumerWidget {
           children: [
             LargeTitle(
               title: 'Análisis',
-              subtitle: 'Cómo se reparte tu dinero',
               trailing: [
                 CircleButton(
                   icon: CupertinoIcons.tag,
@@ -131,13 +125,13 @@ class _FlowCardState extends ConsumerState<_FlowCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const SectionHeader(title: 'Flujo de dinero'),
+        const SizedBox(height: 12),
         SegmentedTabs(
           segments: _labels,
           selected: _period,
           onChanged: (p) => setState(() => _period = p),
         ),
-        const SizedBox(height: 16),
-        const SectionHeader(title: 'Flujo de dinero'),
         const SizedBox(height: 8),
         transactions.when(
           loading: () => const _MetricsLoadingCard(height: 260),
@@ -192,6 +186,8 @@ class _FlowChart extends StatelessWidget {
         ? maxSpent * 2.5
         : null;
     final maxY = cap ?? (maxIncome > maxSpent ? maxIncome : maxSpent);
+    // Round grid steps with their amount on the side, so bars can be read.
+    final step = niceAxisStep(maxY);
     final averageLabel = switch (period) {
       FlowPeriod.week => 'Promedio diario',
       FlowPeriod.month => 'Promedio semanal',
@@ -236,14 +232,16 @@ class _FlowChart extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(
+            Formatters.dateRange(buckets.first.start, DateTime.now()),
+            style: TextStyle(color: palette.muted, fontSize: 13),
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
-              stat(Formatters.compactMoney(spent), 'Total gastado'),
+              stat(context.money(spent), 'Total gastado'),
               const SizedBox(width: 12),
-              stat(
-                Formatters.compactMoney(spent / buckets.length),
-                averageLabel,
-              ),
+              stat(context.money(spent / buckets.length), averageLabel),
             ],
           ),
           // Nothing to chart: a short note instead of an empty plot.
@@ -273,111 +271,137 @@ class _FlowChart extends StatelessWidget {
             const SizedBox(height: 12),
             SizedBox(
               height: 170,
-              child: BarChart(
-                duration: Motion.of(context, Motion.medium),
-                BarChartData(
-                  alignment: BarChartAlignment.spaceAround,
-                  maxY: maxY == 0 ? 1 : maxY * 1.1,
-                  gridData: FlGridData(
-                    drawVerticalLine: false,
-                    horizontalInterval: maxY == 0 ? 1 : maxY / 3,
-                    getDrawingHorizontalLine: (_) => FlLine(
-                      color: scheme.onSurface.withValues(alpha: .06),
-                      strokeWidth: 1,
+              child: PrivateChart(
+                child: BarChart(
+                  duration: Motion.of(context, Motion.medium),
+                  BarChartData(
+                    alignment: BarChartAlignment.spaceAround,
+                    maxY: maxY == 0 ? 1 : maxY * 1.1,
+                    gridData: FlGridData(
+                      drawVerticalLine: false,
+                      horizontalInterval: step,
+                      getDrawingHorizontalLine: (_) => FlLine(
+                        color: scheme.onSurface.withValues(alpha: .06),
+                        strokeWidth: 1,
+                      ),
                     ),
-                  ),
-                  borderData: FlBorderData(show: false),
-                  titlesData: FlTitlesData(
-                    topTitles: const AxisTitles(),
-                    rightTitles: const AxisTitles(),
-                    leftTitles: const AxisTitles(),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 26,
-                        getTitlesWidget: (value, meta) {
-                          final i = value.toInt();
-                          if (i < 0 || i >= buckets.length) {
-                            return const SizedBox.shrink();
-                          }
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 6),
+                    borderData: FlBorderData(show: false),
+                    titlesData: FlTitlesData(
+                      topTitles: const AxisTitles(),
+                      rightTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 44,
+                          interval: step,
+                          minIncluded: false,
+                          maxIncluded: false,
+                          getTitlesWidget: (value, meta) => Padding(
+                            padding: const EdgeInsets.only(left: 8),
                             child: Text(
-                              _label(buckets[i]),
+                              Formatters.axisMoney(value),
+                              maxLines: 1,
                               style: TextStyle(
-                                fontSize: 12,
-                                color: i == buckets.length - 1
-                                    ? scheme.onSurface
-                                    : palette.muted,
-                                fontWeight: i == buckets.length - 1
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
+                                fontSize: 11,
+                                color: palette.muted,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
                               ),
                             ),
+                          ),
+                        ),
+                      ),
+                      leftTitles: const AxisTitles(),
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 26,
+                          getTitlesWidget: (value, meta) {
+                            final i = value.toInt();
+                            if (i < 0 || i >= buckets.length) {
+                              return const SizedBox.shrink();
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Text(
+                                _label(buckets[i]),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: i == buckets.length - 1
+                                      ? scheme.onSurface
+                                      : palette.muted,
+                                  fontWeight: i == buckets.length - 1
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                    barTouchData: BarTouchData(
+                      touchTooltipData: BarTouchTooltipData(
+                        getTooltipColor: (_) => palette.pill,
+                        fitInsideHorizontally: true,
+                        fitInsideVertically: true,
+                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                          if (rodIndex != 0) return null;
+                          final b = buckets[groupIndex];
+                          final style = TextStyle(
+                            color: palette.onPill,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          );
+                          return BarTooltipItem(
+                            '${_tooltipTitle(b)}\n',
+                            style.copyWith(fontWeight: FontWeight.w700),
+                            children: [
+                              TextSpan(
+                                text:
+                                    'Ingresos ${context.money(b.income)}\n'
+                                    'Gastos ${context.money(b.spent)}',
+                                style: style,
+                              ),
+                            ],
                           );
                         },
                       ),
                     ),
-                  ),
-                  barTouchData: BarTouchData(
-                    touchTooltipData: BarTouchTooltipData(
-                      getTooltipColor: (_) => palette.pill,
-                      fitInsideHorizontally: true,
-                      fitInsideVertically: true,
-                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                        if (rodIndex != 0) return null;
-                        final b = buckets[groupIndex];
-                        final style = TextStyle(
-                          color: palette.onPill,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        );
-                        return BarTooltipItem(
-                          '${_tooltipTitle(b)}\n',
-                          style.copyWith(fontWeight: FontWeight.w700),
-                          children: [
-                            TextSpan(
-                              text:
-                                  'Ingresos ${Formatters.compactMoney(b.income)}\n'
-                                  'Gastos ${Formatters.compactMoney(b.spent)}',
-                              style: style,
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                  barGroups: [
-                    for (var i = 0; i < buckets.length; i++)
-                      BarChartGroupData(
-                        x: i,
-                        barsSpace: 2,
-                        barRods: [
-                          for (final (value, color) in [
-                            (buckets[i].income, palette.chartIncome),
-                            (buckets[i].spent, palette.chartExpense),
-                          ])
-                            BarChartRodData(
-                              toY: cap != null && value > cap ? cap : value,
-                              color: cap != null && value > cap ? null : color,
-                              gradient: cap != null && value > cap
-                                  ? LinearGradient(
-                                      begin: Alignment.bottomCenter,
-                                      end: Alignment.topCenter,
-                                      colors: [
-                                        color,
-                                        color.withValues(alpha: .15),
-                                      ],
-                                    )
-                                  : null,
-                              width: period == FlowPeriod.year ? 7 : 12,
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(4),
+                    barGroups: [
+                      for (var i = 0; i < buckets.length; i++)
+                        BarChartGroupData(
+                          x: i,
+                          barsSpace: 2,
+                          barRods: [
+                            for (final (value, color) in [
+                              (buckets[i].income, palette.chartIncome),
+                              (buckets[i].spent, palette.chartExpense),
+                            ])
+                              BarChartRodData(
+                                toY: cap != null && value > cap ? cap : value,
+                                color: cap != null && value > cap
+                                    ? null
+                                    : color,
+                                gradient: cap != null && value > cap
+                                    ? LinearGradient(
+                                        begin: Alignment.bottomCenter,
+                                        end: Alignment.topCenter,
+                                        colors: [
+                                          color,
+                                          color.withValues(alpha: .15),
+                                        ],
+                                      )
+                                    : null,
+                                width: period == FlowPeriod.year ? 7 : 12,
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(4),
+                                ),
                               ),
-                            ),
-                        ],
-                      ),
-                  ],
+                          ],
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -396,8 +420,14 @@ class _AnalyzeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
+    // Secondary and tinted: the page's content is the charts.
     return FilledButton.icon(
-      style: FilledButton.styleFrom(shape: const StadiumBorder()),
+      style: FilledButton.styleFrom(
+        shape: const StadiumBorder(),
+        backgroundColor: palette.card,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
+      ),
       onPressed: () => showModalBottomSheet<void>(
         sheetAnimationStyle: Motion.sheet,
         context: context,
@@ -461,7 +491,7 @@ class _AnalysisSheet extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        message,
+                        context.privateMoneyText(message),
                         style: TextStyle(
                           height: 1.35,
                           fontWeight: FontWeight.w500,
@@ -498,12 +528,14 @@ class _EfficiencyCard extends StatelessWidget {
     final effVal = (data.efficiencyPercent / 100).clamp(0, 1).toDouble();
 
     return BentoCard(
-      color: palette.ink,
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PillTag(label: 'Eficiencia de ahorro', color: palette.onInk),
+          Text(
+            'Ahorro en metas',
+            style: TextStyle(color: palette.muted, fontWeight: FontWeight.w600),
+          ),
           const SizedBox(height: 18),
           Row(
             children: [
@@ -522,14 +554,16 @@ class _EfficiencyCard extends StatelessWidget {
                           value: value,
                           strokeWidth: 12,
                           strokeCap: StrokeCap.round,
-                          color: palette.accent,
-                          backgroundColor: palette.onInk.withValues(alpha: .14),
+                          color: palette.positive,
+                          backgroundColor: palette.fill,
                         ),
                       ),
                       Text(
                         '${data.efficiencyPercent.toStringAsFixed(0)}%',
                         style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(color: palette.onInk),
+                            ?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
                       ),
                     ],
                   ),
@@ -543,19 +577,19 @@ class _EfficiencyCard extends StatelessWidget {
                     Text(
                       data.message,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: palette.onInk,
+                        color: Theme.of(context).colorScheme.onSurface,
                         height: 1.3,
                       ),
                     ),
                     const SizedBox(height: 14),
                     _EfficiencyStat(
                       label: 'Ingresos',
-                      value: Formatters.compactMoney(data.totalIncome),
+                      value: context.money(data.totalIncome),
                     ),
                     const SizedBox(height: 8),
                     _EfficiencyStat(
-                      label: 'Ahorrado',
-                      value: Formatters.compactMoney(data.totalSaved),
+                      label: 'En metas',
+                      value: context.money(data.totalSaved),
                     ),
                   ],
                 ),
@@ -583,7 +617,7 @@ class _EfficiencyStat extends StatelessWidget {
           child: Text(
             label,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: palette.inkMuted),
+            style: TextStyle(color: palette.muted),
           ),
         ),
         Flexible(
@@ -593,7 +627,7 @@ class _EfficiencyStat extends StatelessWidget {
             child: Text(
               value,
               style: TextStyle(
-                color: palette.onInk,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -639,7 +673,7 @@ class _CategoryExpensesCard extends StatelessWidget {
                     ),
                     const Gap(2),
                     Text(
-                      items.isEmpty ? '—' : Formatters.compactMoney(totalGasto),
+                      items.isEmpty ? '—' : context.money(totalGasto),
                       style: Theme.of(context).textTheme.headlineSmall
                           ?.copyWith(fontWeight: FontWeight.w600, height: 1),
                     ),
@@ -648,23 +682,26 @@ class _CategoryExpensesCard extends StatelessWidget {
               ),
               if (items.isNotEmpty)
                 Flexible(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: palette.mint,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      '${items.length} ${items.length == 1 ? 'categoría' : 'categorías'}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: palette.onMint,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
+                  child: Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: palette.mint,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '${items.length} ${items.length == 1 ? 'categoría' : 'categorías'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: palette.onMint,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                   ),
@@ -696,7 +733,7 @@ class _CategoryExpensesCard extends StatelessWidget {
               _CategoryExpenseRow(
                 item: items[i],
                 index: i,
-                color: _colorFor(i),
+                color: _rankColor(context, i),
               ),
               if (i < items.length - 1)
                 Padding(
@@ -733,109 +770,109 @@ class _BarsChart extends StatelessWidget {
       child: Column(
         children: [
           Expanded(
-            child: BarChart(
-              BarChartData(
-                alignment: BarChartAlignment.spaceAround,
-                maxY:
-                    topItems.fold(0.0, (m, e) => e.total > m ? e.total : m) *
-                    1.22,
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  horizontalInterval: topItems.isEmpty
-                      ? 1
-                      : topItems.fold(
-                              0.0,
-                              (m, e) => e.total > m ? e.total : m,
-                            ) /
-                            3,
-                  getDrawingHorizontalLine: (value) => FlLine(
-                    color: scheme.onSurface.withValues(alpha: .06),
-                    strokeWidth: 1,
-                    dashArray: [4, 6],
+            child: PrivateChart(
+              child: BarChart(
+                BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY:
+                      topItems.fold(0.0, (m, e) => e.total > m ? e.total : m) *
+                      1.22,
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: topItems.isEmpty
+                        ? 1
+                        : topItems.fold(
+                                0.0,
+                                (m, e) => e.total > m ? e.total : m,
+                              ) /
+                              3,
+                    getDrawingHorizontalLine: (value) => FlLine(
+                      color: scheme.onSurface.withValues(alpha: .06),
+                      strokeWidth: 1,
+                      dashArray: [4, 6],
+                    ),
                   ),
-                ),
-                borderData: FlBorderData(show: false),
-                titlesData: FlTitlesData(
-                  show: true,
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
+                  borderData: FlBorderData(show: false),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 32,
+                        getTitlesWidget: (value, meta) {
+                          final idx = value.toInt();
+                          if (idx < 0 || idx >= topItems.length) {
+                            return const SizedBox.shrink();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Icon(
+                              iconFromApi(topItems[idx].icon),
+                              size: 16,
+                              color: idx == 0
+                                  ? scheme.onSurface
+                                  : context.palette.muted,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  leftTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 32,
-                      getTitlesWidget: (value, meta) {
-                        final idx = value.toInt();
-                        if (idx < 0 || idx >= topItems.length) {
-                          return const SizedBox.shrink();
-                        }
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Icon(
-                            iconFromApi(topItems[idx].icon),
-                            size: 16,
-                            color: _colorFor(idx),
+                  barTouchData: BarTouchData(
+                    enabled: true,
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipColor: (_) => scheme.surfaceContainerHighest,
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        final item = topItems[groupIndex];
+                        return BarTooltipItem(
+                          '${item.categoryName}\n',
+                          TextStyle(
+                            color: scheme.onSurface,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
                           ),
+                          children: [
+                            TextSpan(
+                              text: context.money(item.total),
+                              style: TextStyle(
+                                color: scheme.onSurface,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
                         );
                       },
                     ),
                   ),
-                ),
-                barTouchData: BarTouchData(
-                  enabled: true,
-                  touchTooltipData: BarTouchTooltipData(
-                    getTooltipColor: (_) => scheme.surfaceContainerHighest,
-                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                      final item = topItems[groupIndex];
-                      return BarTooltipItem(
-                        '${item.categoryName}\n',
-                        TextStyle(
-                          color: scheme.onSurface,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                        children: [
-                          TextSpan(
-                            text: Formatters.compactMoney(item.total),
-                            style: TextStyle(
-                              color: _colorFor(groupIndex),
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
-                            ),
+                  barGroups: topItems.asMap().entries.map((entry) {
+                    final color = _rankColor(context, entry.key);
+                    return BarChartGroupData(
+                      x: entry.key,
+                      barRods: [
+                        BarChartRodData(
+                          toY: entry.value.total,
+                          width: 20,
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(8),
+                            bottom: Radius.circular(4),
                           ),
-                        ],
-                      );
-                    },
-                  ),
+                          color: color,
+                        ),
+                      ],
+                    );
+                  }).toList(),
                 ),
-                barGroups: topItems.asMap().entries.map((entry) {
-                  final color = _colorFor(entry.key);
-                  return BarChartGroupData(
-                    x: entry.key,
-                    barRods: [
-                      BarChartRodData(
-                        toY: entry.value.total,
-                        width: 20,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(8),
-                          bottom: Radius.circular(4),
-                        ),
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [color, color.withValues(alpha: .55)],
-                        ),
-                      ),
-                    ],
-                  );
-                }).toList(),
               ),
             ),
           ),
@@ -878,15 +915,18 @@ class _CategoryExpenseRow extends StatelessWidget {
             ),
           ),
           const Gap(10),
-          // Icono con color de la categoría
           Container(
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: .12),
+              color: scheme.onSurface.withValues(alpha: .08),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(iconFromApi(item.icon), size: 20, color: color),
+            child: Icon(
+              iconFromApi(item.icon),
+              size: 20,
+              color: scheme.onSurface,
+            ),
           ),
           const Gap(12),
           // Nombre + barra de progreso
@@ -912,11 +952,8 @@ class _CategoryExpenseRow extends StatelessWidget {
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.centerRight,
                         child: Text(
-                          Formatters.compactMoney(item.total),
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: color,
-                          ),
+                          context.money(item.total),
+                          style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
                     ),

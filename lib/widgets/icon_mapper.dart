@@ -42,7 +42,25 @@ const _icons = <String, IconData>{
   'subscriptions': Icons.subscriptions_outlined,
 };
 
+/// Offered only for savings goals (the category picker stays short).
+const _goalOnlyIcons = <String, IconData>{
+  'headphones': Icons.headphones_outlined,
+  'photo_camera': Icons.photo_camera_outlined,
+  'watch': Icons.watch_outlined,
+  'tv': Icons.tv_outlined,
+  'beach_access': Icons.beach_access_outlined,
+  'luggage': Icons.luggage_outlined,
+  'two_wheeler': Icons.two_wheeler_outlined,
+  'pedal_bike': Icons.pedal_bike_outlined,
+  'chair': Icons.chair_outlined,
+  'diamond': Icons.diamond_outlined,
+  'child_friendly': Icons.child_friendly_outlined,
+  'piano': Icons.piano_outlined,
+  'health_and_safety': Icons.health_and_safety_outlined,
+};
+
 /// Icon names offered when creating or editing a category.
 final categoryIconNames = _icons.keys.toList(growable: false);
 
-IconData iconFromApi(String name) => _icons[name] ?? Icons.category_outlined;
+IconData iconFromApi(String name) =>
+    _icons[name] ?? _goalOnlyIcons[name] ?? Icons.category_outlined;

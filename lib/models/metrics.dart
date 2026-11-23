@@ -34,16 +34,18 @@ class SavingsEfficiency {
   final double totalSaved;
   final double efficiencyPercent;
 
+  /// Only goal contributions count as saved (money left in the balance
+  /// doesn't), so the copy talks about goals, not about saving in general.
   String get message {
-    if (totalIncome == 0) return 'Registra ingresos para medir tu eficiencia.';
-    if (efficiencyPercent >= 25) return 'Excelente ritmo de ahorro.';
+    if (totalIncome == 0) return 'Registra ingresos para ver cuánto apartas.';
+    if (efficiencyPercent >= 25) return 'Excelente: apartas buena parte.';
     if (efficiencyPercent >= 10) {
-      return 'Vas bien, tu ahorro está tomando forma.';
+      return 'Vas bien, tus metas están tomando forma.';
     }
     if (totalSaved == 0) {
-      return 'Aporta a una meta para empezar a medir tu ahorro.';
+      return 'Aparta parte de tu balance en una meta y lo verás aquí.';
     }
-    return 'Pequeños aportes constantes pueden subir tu eficiencia.';
+    return 'Pequeños aportes constantes suben este porcentaje.';
   }
 
   factory SavingsEfficiency.fromJson(Map<String, dynamic> json) =>

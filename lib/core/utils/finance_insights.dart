@@ -23,9 +23,41 @@ PeriodSummary recentSummary(
   int days = 30,
 }) {
   final start = DateTime(now.year, now.month, now.day - (days - 1));
+  return _summaryBetween(items, start, null);
+}
+
+/// This calendar month so far, and the previous month up to the same day
+/// (clamped to its length), to compare how the month is going.
+({PeriodSummary current, PeriodSummary previous}) monthToDate(
+  List<Transaction> items,
+  DateTime now,
+) {
+  final start = DateTime(now.year, now.month);
+  final previousStart = DateTime(now.year, now.month - 1);
+  final previousLength = DateTime(now.year, now.month, 0).day;
+  final previousEnd = DateTime(
+    now.year,
+    now.month - 1,
+    (now.day < previousLength ? now.day : previousLength) + 1,
+  );
+  return (
+    current: _summaryBetween(items, start, null),
+    previous: _summaryBetween(items, previousStart, previousEnd),
+  );
+}
+
+/// Local [start] inclusive, [end] exclusive (null: no end).
+PeriodSummary _summaryBetween(
+  List<Transaction> items,
+  DateTime start,
+  DateTime? end,
+) {
   var income = 0.0, spent = 0.0, saved = 0.0;
   for (final t in items) {
-    if (t.date.toLocal().isBefore(start)) continue;
+    final date = t.date.toLocal();
+    if (date.isBefore(start) || (end != null && !date.isBefore(end))) {
+      continue;
+    }
     if (t.type == TransactionType.income) {
       income += t.amount;
     } else if (t.isGoalContribution) {
@@ -115,4 +147,22 @@ List<FlowBucket> flowBuckets(
     for (var i = 0; i < starts.length; i++)
       FlowBucket(starts[i], income[i], spent[i]),
   ];
+}
+
+/// A round step for a chart axis that reaches [max] in about [ticks] steps:
+/// 1, 2, 2.5 or 5 times a power of ten ($10, $25, $50…).
+double niceAxisStep(double max, {int ticks = 3}) {
+  if (max <= 0) return 1;
+  final raw = max / ticks;
+  var magnitude = 1.0;
+  while (magnitude * 10 <= raw) {
+    magnitude *= 10;
+  }
+  while (magnitude > raw) {
+    magnitude /= 10;
+  }
+  for (final factor in const [1.0, 2.0, 2.5, 5.0, 10.0]) {
+    if (magnitude * factor >= raw) return magnitude * factor;
+  }
+  return magnitude * 10;
 }

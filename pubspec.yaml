@@ -55,6 +55,8 @@ dependencies:
   flutter_timezone: ^5.1.1
   path_parsing: ^1.1.0
   supabase_flutter: ^2.18.2
+  sentry_flutter: ^8.14.2
+  local_auth: ^3.0.2
 
 dev_dependencies:
   flutter_test:

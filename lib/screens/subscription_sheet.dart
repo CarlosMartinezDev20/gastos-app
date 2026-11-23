@@ -1,3 +1,4 @@
+import '../widgets/money_privacy.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -347,6 +348,7 @@ class _SubscriptionSheetState extends ConsumerState<_SubscriptionSheet> {
                 builder: (context, focusNode) => TextFormField(
                   controller: _amount,
                   focusNode: focusNode,
+                  obscureText: MoneyPrivacyScope.hiddenOf(context),
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),

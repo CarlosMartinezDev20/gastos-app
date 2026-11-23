@@ -1,3 +1,4 @@
+import '../widgets/money_privacy.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -273,6 +274,7 @@ class _PaymentMethodSheetState extends ConsumerState<PaymentMethodSheet> {
                 const SizedBox(height: 14),
                 TextFormField(
                   controller: _limit,
+                  obscureText: MoneyPrivacyScope.hiddenOf(context),
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),

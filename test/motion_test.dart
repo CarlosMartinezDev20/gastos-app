@@ -136,4 +136,34 @@ void main() {
     await tester.pump(const Duration(milliseconds: 16));
     expect(tester.hasRunningAnimations, isFalse);
   });
+
+  testWidgets('returning to a page does not replay its entrance', (
+    tester,
+  ) async {
+    FadeSlideIn.resetPlayed();
+    Widget page({required bool shown}) => MaterialApp(
+      home: Navigator(
+        pages: [
+          MaterialPage<void>(
+            key: const ValueKey('/home'),
+            child: shown
+                ? const FadeSlideIn(child: Text('Balance'))
+                : const SizedBox.shrink(),
+          ),
+        ],
+        onDidRemovePage: (_) {},
+      ),
+    );
+    await tester.pumpWidget(page(shown: true));
+    await tester.pump();
+    expect(tester.hasRunningAnimations, isTrue);
+    await tester.pumpAndSettle();
+
+    // Away and back (a new FadeSlideIn on the same page): shown at once.
+    await tester.pumpWidget(page(shown: false));
+    await tester.pumpWidget(page(shown: true));
+    await tester.pump();
+    expect(tester.hasRunningAnimations, isFalse);
+    expect(find.text('Balance'), findsOneWidget);
+  });
 }

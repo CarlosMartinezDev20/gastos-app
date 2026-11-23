@@ -90,7 +90,6 @@ class CustomizeHomeScreen extends ConsumerWidget {
                   const SizedBox(height: 16),
                   LargeTitle(
                     title: 'Tu inicio',
-                    subtitle: 'Elige, ordena y dale color a tus widgets',
                     trailing: [
                       CircleButton(
                         icon: CupertinoIcons.arrow_counterclockwise,

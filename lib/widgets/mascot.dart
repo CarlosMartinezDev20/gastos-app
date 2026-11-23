@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../core/utils/mascot_insights.dart';
 
-export '../core/utils/mascot_insights.dart' show MascotMood, MascotTip;
+export '../core/utils/mascot_insights.dart'
+    show MascotMood, MascotReaction, MascotTip;
 
 const mascotName = 'Michi';
 
@@ -21,6 +22,13 @@ const mascotName = 'Michi';
 /// Forms can steer it: [gaze] points its eyes (e.g. at the text being typed)
 /// and [coverEyes] makes it hide its eyes behind its paws, peeking through
 /// one paw when [peek] is set (a password being shown).
+///
+/// A [controller] makes it react on cue (e.g. when a step of the tour
+/// appears), and [talking] moves its mouth as if it spoke.
+///
+/// After [restAfterLoops] idle loops with nothing happening it settles into
+/// its resting pose and stops animating (no frames, no battery), until it's
+/// touched, hovered, its mood changes or a form steers it again.
 class Mascot extends StatefulWidget {
   const Mascot({
     super.key,
@@ -30,10 +38,15 @@ class Mascot extends StatefulWidget {
     this.gaze,
     this.coverEyes = false,
     this.peek = false,
+    this.talking = false,
+    this.controller,
   });
 
   /// Looping animations never settle, so widget tests turn them off.
   static bool animate = true;
+
+  /// Idle loops (4 s each) before it rests.
+  static const restAfterLoops = 4;
 
   /// Picks the spontaneous actions; tests can make it predictable.
   @visibleForTesting
@@ -49,11 +62,35 @@ class Mascot extends StatefulWidget {
   final bool coverEyes;
   final bool peek;
 
+  /// Opens and closes its mouth, like it's talking.
+  final bool talking;
+
+  /// Plays reactions on cue.
+  final MascotController? controller;
+
   @override
   State<Mascot> createState() => _MascotState();
 }
 
-enum _Reaction { jump, wiggle, wave }
+/// Makes a [Mascot] react from outside (a tap on it reacts by itself).
+class MascotController extends ChangeNotifier {
+  MascotReaction _reaction = MascotReaction.jump;
+  var _confetti = false;
+
+  /// Does [reaction] once.
+  void react(MascotReaction reaction) {
+    _reaction = reaction;
+    _confetti = false;
+    notifyListeners();
+  }
+
+  /// Jumps with confetti.
+  void celebrate() {
+    _reaction = MascotReaction.jump;
+    _confetti = true;
+    notifyListeners();
+  }
+}
 
 /// Things Michi does on its own while idle.
 enum _Action { none, yawn, groom, lookAround, stretch }
@@ -99,12 +136,15 @@ class _MascotState extends State<Mascot> with TickerProviderStateMixin {
   final _look = ValueNotifier(Offset.zero);
   Offset? _pointer;
 
-  var _reaction = _Reaction.jump;
+  var _reaction = MascotReaction.jump;
   var _action = _Action.none;
   var _taps = 0;
 
   /// Idle loops left before the next spontaneous action.
   var _loopsToAction = 2;
+
+  /// Idle loops left before it rests (see [Mascot.restAfterLoops]).
+  var _loopsToRest = Mascot.restAfterLoops;
   var _lastIdle = 0.0;
   var _popFrom = 1.0;
   var _enabled = false;
@@ -116,6 +156,7 @@ class _MascotState extends State<Mascot> with TickerProviderStateMixin {
     _look.value = widget.gaze ?? Offset.zero;
     _idle.addListener(_followPointer);
     _idle.addListener(_maybeAct);
+    widget.controller?.addListener(_onCue);
   }
 
   @override
@@ -127,7 +168,7 @@ class _MascotState extends State<Mascot> with TickerProviderStateMixin {
     if (enabled == _enabled) return;
     _enabled = enabled;
     if (enabled) {
-      _idle.repeat();
+      _wake();
       if (firstTime) _popIn(from: .2);
     } else {
       _idle
@@ -146,6 +187,17 @@ class _MascotState extends State<Mascot> with TickerProviderStateMixin {
   @override
   void didUpdateWidget(Mascot oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.mood != widget.mood ||
+        oldWidget.gaze != widget.gaze ||
+        oldWidget.coverEyes != widget.coverEyes ||
+        oldWidget.peek != widget.peek ||
+        oldWidget.talking != widget.talking) {
+      _wake();
+    }
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?.removeListener(_onCue);
+      widget.controller?.addListener(_onCue);
+    }
     if (oldWidget.mood != widget.mood && _enabled) {
       _popIn(from: .86);
       if (widget.mood == MascotMood.excited) _confetti.forward(from: 0);
@@ -167,6 +219,7 @@ class _MascotState extends State<Mascot> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    widget.controller?.removeListener(_onCue);
     _idle.dispose();
     _react.dispose();
     _pop.dispose();
@@ -193,20 +246,43 @@ class _MascotState extends State<Mascot> with TickerProviderStateMixin {
     if ((next - _look.value).distanceSquared > 1e-5) _look.value = next;
   }
 
+  /// Restarts the idle loop after a rest, and the count towards the next.
+  void _wake() {
+    _loopsToRest = Mascot.restAfterLoops;
+    if (_enabled && !_idle.isAnimating) {
+      _lastIdle = 0;
+      _idle.repeat();
+    }
+  }
+
   /// Counts idle loops and, now and then, starts a spontaneous action that
-  /// fits the mood (no timers: it rides on the idle animation).
+  /// fits the mood (no timers: it rides on the idle animation). After
+  /// [Mascot.restAfterLoops] quiet loops it rests at the loop's start, so
+  /// stopping there is seamless.
   void _maybeAct() {
     final t = _idle.value;
     final wrapped = t < _lastIdle;
     _lastIdle = t;
-    if (!wrapped || --_loopsToAction > 0) return;
-    _loopsToAction = 2 + Mascot.random.nextInt(2);
+    if (!wrapped) return;
     final busy =
         _react.isAnimating ||
         _act.isAnimating ||
         _pet.value > 0 ||
         widget.coverEyes ||
+        widget.talking ||
         widget.gaze != null;
+    if (busy) {
+      _loopsToRest = Mascot.restAfterLoops;
+    } else if (--_loopsToRest <= 0) {
+      // Setting the value notifies again: as t == _lastIdle it's no wrap.
+      _lastIdle = 0;
+      _idle
+        ..stop()
+        ..value = 0;
+      return;
+    }
+    if (--_loopsToAction > 0) return;
+    _loopsToAction = 2 + Mascot.random.nextInt(2);
     if (busy) return;
     final options = switch (widget.mood) {
       MascotMood.sleepy => const [_Action.yawn, _Action.yawn, _Action.stretch],
@@ -225,6 +301,7 @@ class _MascotState extends State<Mascot> with TickerProviderStateMixin {
 
   void _startPetting() {
     if (!_enabled) return;
+    _wake();
     _act.stop();
     _act.value = 0;
     _pet.forward();
@@ -235,23 +312,32 @@ class _MascotState extends State<Mascot> with TickerProviderStateMixin {
   }
 
   void _hover(PointerEvent event) {
+    _wake();
     final half = widget.size / 2;
     final offset = (event.localPosition - Offset(half, half * .9)) / half;
     final distance = offset.distance;
     _pointer = distance > 1 ? offset / distance : offset;
   }
 
+  void _onCue() {
+    final controller = widget.controller;
+    if (controller == null) return;
+    _play(controller._reaction);
+    if (_enabled && controller._confetti) _confetti.forward(from: 0);
+  }
+
+  void _play(MascotReaction reaction) {
+    if (!_enabled) return;
+    _wake();
+    setState(() => _reaction = reaction);
+    _act
+      ..stop()
+      ..value = 0;
+    _react.forward(from: 0);
+  }
+
   void _handleTap() {
-    if (_enabled) {
-      setState(() {
-        _reaction = _Reaction.values[_taps % _Reaction.values.length];
-        _taps++;
-      });
-      _act
-        ..stop()
-        ..value = 0;
-      _react.forward(from: 0);
-    }
+    _play(MascotReaction.values[_taps++ % MascotReaction.values.length]);
     widget.onTap?.call();
   }
 
@@ -291,6 +377,7 @@ class _MascotState extends State<Mascot> with TickerProviderStateMixin {
                   reaction: _reaction,
                   action: _action,
                   mood: widget.mood,
+                  talking: widget.talking,
                 ),
               ),
             ),
@@ -318,6 +405,7 @@ class _KittenPainter extends CustomPainter {
     required this.reaction,
     required this.action,
     required this.mood,
+    required this.talking,
   }) : super(
          repaint: Listenable.merge([
            idle,
@@ -342,9 +430,10 @@ class _KittenPainter extends CustomPainter {
   final Animation<double> pet;
   final Animation<double> confetti;
   final double popFrom;
-  final _Reaction reaction;
+  final MascotReaction reaction;
   final _Action action;
   final MascotMood mood;
+  final bool talking;
 
   // A ginger tabby with a cream muzzle and a gold coin on its collar.
   static const _fur = Color(0xFFFFB760);
@@ -394,9 +483,9 @@ class _KittenPainter extends CustomPainter {
     final t = idle.value;
     final r = react.value;
     final reacting = r > 0 && r < 1;
-    final jumping = reacting && reaction == _Reaction.jump;
-    final wiggling = reacting && reaction == _Reaction.wiggle;
-    final waving = reacting && reaction == _Reaction.wave;
+    final jumping = reacting && reaction == MascotReaction.jump;
+    final wiggling = reacting && reaction == MascotReaction.wiggle;
+    final waving = reacting && reaction == MascotReaction.wave;
     final a = act.value;
     final acting = !reacting && a > 0 && a < 1 && action != _Action.none;
     // 0 → 1 → 0 over the action, eased so it holds a moment at the peak.
@@ -1055,6 +1144,29 @@ class _KittenPainter extends CustomPainter {
       canvas.restore();
       return;
     }
+    if (talking && face != MascotMood.excited) {
+      // Chatting: the mouth opens and closes about three times a second.
+      final open = math.sin(t * _tau * 12).abs();
+      canvas.drawLine(const Offset(50, 57.5), const Offset(50, 59), stroke);
+      final mouth = Rect.fromCenter(
+        center: Offset(50, 60.6 + open * 1.2),
+        width: 4.2 + open * 1.6,
+        height: 1.6 + open * 3.6,
+      );
+      canvas.drawOval(mouth, Paint()..color = _ink);
+      canvas.save();
+      canvas.clipPath(Path()..addOval(mouth));
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(50, mouth.bottom - .8),
+          width: mouth.width * .75,
+          height: mouth.height * .5,
+        ),
+        Paint()..color = _nose,
+      );
+      canvas.restore();
+      return;
+    }
     if (groom > .3) {
       // Licking the paw: the tongue darts in and out.
       canvas.drawPath(cat(3.6), stroke);
@@ -1329,6 +1441,7 @@ class _KittenPainter extends CustomPainter {
   bool shouldRepaint(_KittenPainter oldDelegate) =>
       oldDelegate.mood != mood ||
       oldDelegate.reaction != reaction ||
+      oldDelegate.talking != talking ||
       oldDelegate.action != action ||
       oldDelegate.popFrom != popFrom;
 }

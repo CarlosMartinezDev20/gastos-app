@@ -1,9 +1,11 @@
+import 'money_privacy.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/utils/formatters.dart';
+import '../core/utils/transaction_filter.dart';
 import '../models/category.dart';
 import '../models/transaction.dart';
 import '../providers/finance_providers.dart';
@@ -14,8 +16,15 @@ import 'icon_mapper.dart';
 import '../core/theme/motion.dart';
 
 class TransactionTile extends StatelessWidget {
-  const TransactionTile({super.key, required this.transaction});
+  const TransactionTile({
+    super.key,
+    required this.transaction,
+    this.showDate = true,
+  });
   final Transaction transaction;
+
+  /// Off where a day header above already says it (Historial).
+  final bool showDate;
 
   void _openDetail(BuildContext context) => showModalBottomSheet<void>(
     sheetAnimationStyle: Motion.sheet,
@@ -41,19 +50,28 @@ class TransactionTile extends StatelessWidget {
         : transaction.isGoalContribution
         ? (palette.lilac, palette.onLilac)
         : (palette.blush, palette.onBlush);
+    // The category only when the title doesn't already say it
+    // ("Teléfono · Teléfono").
+    final category = transaction.category.name;
+    final subtitle = [
+      if (normalizeText(category.trim()) !=
+          normalizeText(transaction.title.trim()))
+        category,
+      if (showDate) Formatters.shortDate.format(transaction.date.toLocal()),
+    ].join(' · ');
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      // About as tall as an iOS list row with a subtitle (Material's
+      // two-line tile is 72).
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+      visualDensity: const VisualDensity(vertical: -2),
       leading: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: tint,
-          borderRadius: BorderRadius.circular(21),
-        ),
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(color: tint, shape: BoxShape.circle),
         child: Icon(
           iconFromApi(transaction.category.icon),
           color: onTint,
-          size: 21,
+          size: 20,
         ),
       ),
       title: Text(
@@ -62,53 +80,42 @@ class TransactionTile extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(fontWeight: FontWeight.w600),
       ),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 2),
-        child: Text.rich(
-          TextSpan(
-            children: [
-              // Marks movements a recurring rule created.
-              if (transaction.isRecurring)
-                WidgetSpan(
-                  alignment: PlaceholderAlignment.middle,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: Icon(
-                      Icons.repeat_rounded,
-                      size: 14,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
+      subtitle: subtitle.isEmpty && !transaction.isRecurring
+          ? null
+          : Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    // Marks movements a recurring rule created.
+                    if (transaction.isRecurring)
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Icon(
+                            Icons.repeat_rounded,
+                            size: 14,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    TextSpan(text: subtitle),
+                  ],
                 ),
-              TextSpan(
-                text:
-                    '${transaction.category.name} · ${Formatters.shortDate.format(transaction.date.toLocal())}',
+                style: TextStyle(color: scheme.onSurfaceVariant),
               ),
-            ],
-          ),
-          style: TextStyle(color: scheme.onSurfaceVariant),
-        ),
-      ),
+            ),
       trailing: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 120),
-        child: Container(
-          // Income gets a lime badge.
-          padding: income
-              ? const EdgeInsets.symmetric(horizontal: 8, vertical: 3)
-              : EdgeInsets.zero,
-          decoration: income
-              ? BoxDecoration(
-                  color: palette.accent,
-                  borderRadius: BorderRadius.circular(999),
-                )
-              : null,
-          child: Text(
-            _signedAmount(transaction),
-            textAlign: TextAlign.end,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: income ? palette.onAccent : scheme.onSurface,
-              fontWeight: FontWeight.w700,
-            ),
+        // Income in green text, like iOS Wallet: no badge.
+        child: Text(
+          _signedAmount(context, transaction),
+          textAlign: TextAlign.end,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            color: income ? palette.positive : scheme.onSurface,
+            fontWeight: FontWeight.w600,
+            fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
       ),
@@ -164,12 +171,12 @@ Future<bool> deleteTransactionWithUndo(
   return true;
 }
 
-String _signedAmount(Transaction transaction) {
+String _signedAmount(BuildContext context, Transaction transaction) {
   final positive =
       transaction.type == TransactionType.income ||
       transaction.isGoalWithdrawal;
   return '${positive ? '+' : '−'}'
-      '${Formatters.compactMoney(transaction.amount.abs())}';
+      '${context.money(transaction.amount.abs())}';
 }
 
 class _TransactionDetail extends ConsumerStatefulWidget {
@@ -191,6 +198,12 @@ class _TransactionDetailState extends ConsumerState<_TransactionDetail> {
     final parent = Navigator.of(context).context;
     Navigator.pop(context);
     showNewTransactionSheet(parent, transaction: _tx);
+  }
+
+  void _similar() {
+    final parent = Navigator.of(context).context;
+    Navigator.pop(context);
+    showNewTransactionSheet(parent, similarTo: _tx);
   }
 
   Future<void> _delete() async {
@@ -222,7 +235,7 @@ class _TransactionDetailState extends ConsumerState<_TransactionDetail> {
           Text(_tx.title, style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 4),
           Text(
-            _signedAmount(_tx),
+            _signedAmount(context, _tx),
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
               color: income ? palette.onMint : scheme.onSurface,
               fontWeight: FontWeight.w700,
@@ -242,7 +255,7 @@ class _TransactionDetailState extends ConsumerState<_TransactionDetail> {
                   VerticalDivider(color: palette.hairline, width: 1),
                   _DetailFact(
                     label: 'Fecha',
-                    value: Formatters.fullDate.format(_tx.date.toLocal()),
+                    value: Formatters.dayMonthYear.format(_tx.date.toLocal()),
                   ),
                   VerticalDivider(color: palette.hairline, width: 1),
                   _DetailFact(label: 'Tipo', value: _tx.type.label),
@@ -291,7 +304,13 @@ class _TransactionDetailState extends ConsumerState<_TransactionDetail> {
               icon: const Icon(Icons.savings_outlined),
               label: const Text('Ir a Metas'),
             ),
-          ] else
+          ] else ...[
+            OutlinedButton.icon(
+              onPressed: _deleting ? null : _similar,
+              icon: const Icon(CupertinoIcons.doc_on_doc),
+              label: const Text('Registrar uno similar'),
+            ),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
@@ -326,6 +345,7 @@ class _TransactionDetailState extends ConsumerState<_TransactionDetail> {
                 ),
               ],
             ),
+          ],
         ],
       ),
     );

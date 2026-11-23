@@ -1,3 +1,4 @@
+import '../widgets/money_privacy.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,7 +7,6 @@ import 'package:go_router/go_router.dart';
 
 import '../core/theme/app_palette.dart';
 import '../core/utils/budget_planner.dart';
-import '../core/utils/formatters.dart';
 import '../models/category.dart';
 import '../models/savings_goal.dart';
 import '../models/transaction.dart';
@@ -227,10 +227,7 @@ class _PlannerState extends ConsumerState<_Planner> {
             ],
           ),
           const SizedBox(height: 16),
-          const LargeTitle(
-            title: 'Calculadora',
-            subtitle: 'Arma tu presupuesto a partir de lo que ganas',
-          ),
+          const LargeTitle(title: 'Calculadora'),
           const SizedBox(height: 20),
           // 1. Incomes.
           const _Step(number: 1, title: 'Tus ingresos'),
@@ -372,15 +369,15 @@ class _PlannerState extends ConsumerState<_Planner> {
           'un ${(plan.wantsCut * 100).round()}%.',
     if (plan.needsLeft < -0.5)
       'Tus límites de necesidades suman '
-          '${Formatters.compactMoney(-plan.needsLeft)} más de lo previsto.',
+          '${context.money(-plan.needsLeft)} más de lo previsto.',
     if (plan.wantsLeft < -0.5)
       'Tus límites de gustos suman '
-          '${Formatters.compactMoney(-plan.wantsLeft)} más de lo previsto.',
+          '${context.money(-plan.wantsLeft)} más de lo previsto.',
     if (plan.needsLeft >= 1)
-      'Te quedan ${Formatters.compactMoney(plan.needsLeft)} libres en '
+      'Te quedan ${context.money(plan.needsLeft)} libres en '
           'necesidades.',
     if (plan.wantsLeft >= 1)
-      'Te quedan ${Formatters.compactMoney(plan.wantsLeft)} libres para gustos.',
+      'Te quedan ${context.money(plan.wantsLeft)} libres para gustos.',
   ];
 }
 
@@ -464,13 +461,16 @@ class _IncomeCard extends StatelessWidget {
                 source.name,
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
+              // Paid monthly, the amount is the trailing one: don't repeat it.
               subtitle: Text(
-                '${Formatters.compactMoney(source.amount)} · '
-                '${source.frequency.label}',
+                source.frequency == IncomeFrequency.monthly
+                    ? source.frequency.label
+                    : '${context.money(source.amount)} · '
+                          '${source.frequency.label}',
                 style: TextStyle(color: palette.muted),
               ),
               trailing: Text(
-                '${Formatters.compactMoney(source.monthly)}/mes',
+                '${context.money(source.monthly)}/mes',
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
@@ -501,7 +501,7 @@ class _IncomeCard extends StatelessWidget {
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
-                      Formatters.compactMoney(total),
+                      context.money(total),
                       style: text.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
@@ -644,6 +644,7 @@ class _IncomeSourceSheetState extends State<_IncomeSourceSheet> {
                 builder: (context, focusNode) => TextFormField(
                   controller: _amount,
                   focusNode: focusNode,
+                  obscureText: MoneyPrivacyScope.hiddenOf(context),
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
@@ -670,7 +671,7 @@ class _IncomeSourceSheetState extends State<_IncomeSourceSheet> {
               ListenableBuilder(
                 listenable: _amount,
                 builder: (context, _) => Text(
-                  'Equivale a ${Formatters.compactMoney((_parsed ?? 0) * _frequency.perMonth)} al mes.',
+                  'Equivale a ${context.money((_parsed ?? 0) * _frequency.perMonth)} al mes.',
                   style: TextStyle(color: palette.muted),
                 ),
               ),
@@ -738,6 +739,7 @@ class _LimitDialogState extends State<_LimitDialog> {
         builder: (context, focusNode) => TextField(
           controller: _controller,
           focusNode: focusNode,
+          obscureText: MoneyPrivacyScope.hiddenOf(context),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
@@ -748,7 +750,7 @@ class _LimitDialogState extends State<_LimitDialog> {
             prefixText: r'$ ',
             errorText: _error,
             helperText: widget.item.average > 0
-                ? 'Sueles gastar ${Formatters.compactMoney(widget.item.average)}'
+                ? 'Sueles gastar ${context.money(widget.item.average)}'
                 : 'Aún no tienes gastos en esta categoría',
           ),
         ),
@@ -780,10 +782,12 @@ class _SplitCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final duration = Motion.of(context, Motion.medium);
+    // Chart series, not the tile colors: pastel tiles and the lime accent
+    // fall under 3:1 against the card in one mode or the other.
     final parts = [
-      ('Necesidades', split.needs, plan.needs, palette.ink, palette.onInk),
-      ('Gustos', split.wants, plan.wants, palette.lilac, palette.onLilac),
-      ('Ahorro', split.savings, plan.savings, palette.accent, palette.onAccent),
+      ('Necesidades', split.needs, plan.needs, palette.chartExpense),
+      ('Gustos', split.wants, plan.wants, palette.chartWants),
+      ('Ahorro', split.savings, plan.savings, palette.chartIncome),
     ];
     return BentoCard(
       radius: 24,
@@ -796,12 +800,23 @@ class _SplitCard extends StatelessWidget {
               child: LayoutBuilder(
                 builder: (context, constraints) => Row(
                   children: [
-                    for (final (_, percent, _, color, _) in parts)
+                    for (final (i, (_, percent, _, color)) in parts.indexed)
                       AnimatedContainer(
                         duration: duration,
                         curve: Motion.standard,
                         width: constraints.maxWidth * percent / 100,
-                        color: color,
+                        // A hairline of card between segments keeps them apart.
+                        decoration: BoxDecoration(
+                          color: color,
+                          border: i == 0 || percent == 0
+                              ? null
+                              : Border(
+                                  left: BorderSide(
+                                    color: palette.card,
+                                    width: 2,
+                                  ),
+                                ),
+                        ),
                       ),
                   ],
                 ),
@@ -809,7 +824,7 @@ class _SplitCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          for (final (label, percent, amount, color, _) in parts)
+          for (final (label, percent, amount, color) in parts)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 5),
               child: Row(
@@ -830,7 +845,7 @@ class _SplitCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    Formatters.compactMoney(amount),
+                    context.money(amount),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -870,7 +885,7 @@ class _SavingsHint extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Ahorrando ${Formatters.compactMoney(monthly)} al mes, '
+              'Ahorrando ${context.money(monthly)} al mes, '
               'completarías "${goal.name}" en $months '
               '${months == 1 ? 'mes' : 'meses'}.',
               style: TextStyle(
@@ -930,30 +945,25 @@ class _SuggestionRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Semantics(
-                      button: true,
-                      label: 'Cambiar a ${item.need ? 'gusto' : 'necesidad'}',
-                      child: GestureDetector(
-                        onTap: onToggle,
-                        child: PillTag(
-                          label: item.need ? 'Necesidad' : 'Gusto',
-                          icon: CupertinoIcons.arrow_2_squarepath,
-                        ),
-                      ),
+                // Always the same lines (name, average, tag) so every row
+                // has the same height whatever the tag's width.
+                Text(
+                  item.average > 0
+                      ? 'Promedio ${context.money(item.average)}'
+                      : 'Sin gastos aún',
+                  style: text.bodySmall?.copyWith(color: palette.muted),
+                ),
+                const SizedBox(height: 6),
+                Semantics(
+                  button: true,
+                  label: 'Cambiar a ${item.need ? 'gusto' : 'necesidad'}',
+                  child: GestureDetector(
+                    onTap: onToggle,
+                    child: PillTag(
+                      label: item.need ? 'Necesidad' : 'Gusto',
+                      icon: CupertinoIcons.arrow_2_squarepath,
                     ),
-                    Text(
-                      item.average > 0
-                          ? 'Promedio ${Formatters.compactMoney(item.average)}'
-                          : 'Sin gastos aún',
-                      style: text.bodySmall?.copyWith(color: palette.muted),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -973,7 +983,7 @@ class _SuggestionRow extends StatelessWidget {
               !ready
                   ? '—'
                   : item.suggested > 0
-                  ? Formatters.compactMoney(item.suggested)
+                  ? context.money(item.suggested)
                   : 'Definir',
               style: text.titleMedium?.copyWith(
                 fontWeight: FontWeight.w800,

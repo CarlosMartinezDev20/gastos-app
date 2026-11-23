@@ -50,11 +50,24 @@ class AuthRepository {
     }
   }
 
-  Future<UserProfile> updateProfile({bool? darkMode, String? name}) async {
+  /// [themeMode] and [accent] take the API's values (`LIGHT`/`DARK`/`SYSTEM`,
+  /// `LIME`…); the API keeps `darkMode` in step with [themeMode].
+  Future<UserProfile> updateProfile({
+    bool? darkMode,
+    String? name,
+    String? themeMode,
+    String? accent,
+  }) async {
     try {
       final body = <String, dynamic>{};
       if (darkMode != null) {
         body['darkMode'] = darkMode;
+      }
+      if (themeMode != null) {
+        body['themeMode'] = themeMode;
+      }
+      if (accent != null) {
+        body['accent'] = accent;
       }
       if (name != null) {
         body['name'] = name;
@@ -86,4 +99,19 @@ class AuthRepository {
   }
 
   Future<void> logout() => _api.clearToken();
+
+  /// Emails a link to choose a new password (Supabase Auth). Supabase
+  /// answers the same whether or not the account exists.
+  Future<void> sendPasswordReset(String email) =>
+      _auth.sendPasswordReset(email);
+
+  /// The new password, from the session a reset link opened.
+  Future<void> setNewPassword(String password) =>
+      _auth.setNewPassword(password);
+
+  Future<void> resendConfirmation(String email) =>
+      _auth.resendConfirmation(email);
+
+  /// Reset and confirmation links opened in the app.
+  Stream<AuthLinkEvent> get linkEvents => _auth.linkEvents;
 }

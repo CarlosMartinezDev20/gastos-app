@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_palette.dart';
 import '../core/utils/phone_widget.dart';
 import '../providers/phone_widget_provider.dart';
+import '../providers/theme_provider.dart';
 import '../widgets/ios_ui.dart';
 import '../widgets/phone_widget_preview.dart';
 
@@ -17,6 +18,7 @@ class PhoneWidgetSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = context.palette;
     final settings = ref.watch(phoneWidgetSettingsProvider);
+    final accent = ref.watch(accentControllerProvider);
     final controller = ref.read(phoneWidgetSettingsProvider.notifier);
     final payload = ref.watch(phoneWidgetPayloadProvider);
     final service = ref.watch(phoneWidgetServiceProvider);
@@ -71,6 +73,7 @@ class PhoneWidgetSection extends ConsumerWidget {
                   for (final theme in PhoneWidgetTheme.values)
                     _ThemeSwatch(
                       theme: theme,
+                      colors: theme.colors(accent),
                       selected: theme == settings.theme,
                       onTap: () => controller.setTheme(theme),
                     ),
@@ -116,11 +119,13 @@ class PhoneWidgetSection extends ConsumerWidget {
 class _ThemeSwatch extends StatelessWidget {
   const _ThemeSwatch({
     required this.theme,
+    required this.colors,
     required this.selected,
     required this.onTap,
   });
 
   final PhoneWidgetTheme theme;
+  final PhoneWidgetColors colors;
   final bool selected;
   final VoidCallback onTap;
 
@@ -149,13 +154,13 @@ class _ThemeSwatch extends StatelessWidget {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Color(theme.background),
+                color: Color(colors.background),
               ),
               child: selected
                   ? Icon(
                       CupertinoIcons.checkmark_alt,
                       size: 20,
-                      color: Color(theme.foreground),
+                      color: Color(colors.foreground),
                     )
                   : null,
             ),

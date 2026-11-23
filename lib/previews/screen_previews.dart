@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/finance_providers.dart';
-import '../providers/theme_provider.dart';
 import '../screens/home_screen.dart';
 import '../screens/metrics_screen.dart';
 import 'preview_support.dart';
@@ -13,7 +12,6 @@ const _phone = Size(390, 844);
 /// the sample data instead of the API.
 Widget _withSampleData(Widget screen, {bool empty = false}) => ProviderScope(
   overrides: [
-    isDarkModeProvider.overrideWithValue(false),
     dashboardProvider.overrideWith(
       (ref) async => previewDashboard(empty: empty),
     ),

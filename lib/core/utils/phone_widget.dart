@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import '../../models/dashboard.dart';
+import '../theme/app_accent.dart';
 import 'finance_insights.dart';
 import 'formatters.dart';
 import 'home_layout.dart';
@@ -16,30 +17,61 @@ enum PhoneWidgetContent {
   final String label;
 }
 
-/// Colors of the phone widget. The native widgets (Android
-/// `FinanceWidgetProvider.kt`, iOS `FinanceWidget.swift`) use the same values.
-enum PhoneWidgetTheme {
-  light('Claro', 0xFFFFFFFF, 0xFF1C1C1E, 0xFF64646D, 0xFF8DBF1F),
-  dark('Oscuro', 0xFF1C1C1E, 0xFFF7F7F8, 0xFFA1A1A8, 0xFFC8F04B),
-  lime('Lima', 0xFFC8F04B, 0xFF1A2006, 0xFF4A5A1C, 0xFF1A2006),
-  lilac('Lila', 0xFFE2DDFF, 0xFF514578, 0xFF7A6FA3, 0xFF514578);
+/// The phone widget's four colors, as ARGB ints.
+typedef PhoneWidgetColors = ({
+  int background,
+  int foreground,
+  int muted,
+  int highlight,
+});
 
-  const PhoneWidgetTheme(
-    this.label,
-    this.background,
-    this.foreground,
-    this.muted,
-    this.highlight,
-  );
+/// Styles of the phone widget. The dark one's highlight, the light one's bars
+/// and the whole «Acento» style follow the app's accent; the app sends the
+/// resolved colors in the payload, so the native widgets (Android
+/// `FinanceWidgetProvider.kt`, iOS `FinanceWidget.swift`) don't need a table
+/// per accent (theirs is only the fallback for data saved by older versions).
+enum PhoneWidgetTheme {
+  light('Claro'),
+  dark('Oscuro'),
+  // Named `lime` since before there were accents: saved settings keep working.
+  lime('Acento'),
+  lilac('Lila');
+
+  const PhoneWidgetTheme(this.label);
 
   final String label;
-  final int background;
-  final int foreground;
-  final int muted;
 
-  /// Today's bar and the goal's progress.
-  final int highlight;
+  /// The bars and the goal's progress use `highlight`.
+  PhoneWidgetColors colors(AppAccent accent) => switch (this) {
+    light => (
+      background: 0xFFFFFFFF,
+      foreground: 0xFF1C1C1E,
+      muted: 0xFF64646D,
+      highlight: accent.widgetHighlightLight.toARGB32(),
+    ),
+    dark => (
+      background: 0xFF1C1C1E,
+      foreground: 0xFFF7F7F8,
+      muted: 0xFFA1A1A8,
+      highlight: accent.accent.toARGB32(),
+    ),
+    lime => (
+      background: accent.accent.toARGB32(),
+      foreground: accent.onAccent.toARGB32(),
+      muted: accent.widgetMuted.toARGB32(),
+      highlight: accent.onAccent.toARGB32(),
+    ),
+    lilac => (
+      background: 0xFFE2DDFF,
+      foreground: 0xFF514578,
+      muted: 0xFF7A6FA3,
+      highlight: 0xFF514578,
+    ),
+  };
 }
+
+String _argbHex(int color) =>
+    '#${color.toRadixString(16).padLeft(8, '0').toUpperCase()}';
 
 const phoneWidgetContentKey = 'phone_widget_content';
 const phoneWidgetThemeKey = 'phone_widget_theme';
@@ -49,6 +81,7 @@ const phoneWidgetThemeKey = 'phone_widget_theme';
 class PhoneWidgetPayload {
   const PhoneWidgetPayload({
     required this.theme,
+    this.accent = AppAccent.lima,
     required this.title,
     required this.amount,
     required this.caption,
@@ -57,6 +90,7 @@ class PhoneWidgetPayload {
   });
 
   final PhoneWidgetTheme theme;
+  final AppAccent accent;
   final String title;
   final String amount;
   final String caption;
@@ -67,8 +101,14 @@ class PhoneWidgetPayload {
   /// Heights 0–1, oldest first; the last one is today. Empty hides the chart.
   final List<double> bars;
 
+  PhoneWidgetColors get colors => theme.colors(accent);
+
   Map<String, Object> toData() => {
     'theme': theme.name,
+    'background': _argbHex(colors.background),
+    'foreground': _argbHex(colors.foreground),
+    'muted': _argbHex(colors.muted),
+    'highlight': _argbHex(colors.highlight),
     'title': title,
     'amount': amount,
     'caption': caption,
@@ -89,9 +129,12 @@ PhoneWidgetPayload phoneWidgetPayload(
   DashboardData data, {
   required PhoneWidgetContent content,
   required PhoneWidgetTheme theme,
+  AppAccent accent = AppAccent.lima,
   required bool balanceHidden,
   required DateTime now,
 }) {
+  String money(num value) =>
+      balanceHidden ? '••••••' : Formatters.compactMoney(value);
   final week = lastSevenDays(data.transactions, now);
   final max = week.fold(0.0, (m, d) => math.max(m, d.amount));
   final bars = [for (final d in week) max <= 0 ? 0.0 : d.amount / max];
@@ -100,22 +143,20 @@ PhoneWidgetPayload phoneWidgetPayload(
       final spent = recentSummary(data.transactions, now).spent;
       return PhoneWidgetPayload(
         theme: theme,
+        accent: accent,
         title: 'Balance disponible',
-        amount: balanceHidden
-            ? '••••••'
-            : Formatters.compactMoney(data.balance.balance),
-        caption: 'Gastos 30 días: ${Formatters.compactMoney(spent)}',
-        bars: bars,
+        amount: balanceHidden ? '••••••' : money(data.balance.balance),
+        caption: 'Gastos 30 días: ${money(spent)}',
+        bars: balanceHidden ? const [] : bars,
       );
     case PhoneWidgetContent.week:
       return PhoneWidgetPayload(
         theme: theme,
+        accent: accent,
         title: 'Gastado esta semana',
-        amount: Formatters.compactMoney(
-          week.fold(0.0, (sum, d) => sum + d.amount),
-        ),
-        caption: 'Hoy: ${Formatters.compactMoney(week.last.amount)}',
-        bars: bars,
+        amount: money(week.fold(0.0, (sum, d) => sum + d.amount)),
+        caption: 'Hoy: ${money(week.last.amount)}',
+        bars: balanceHidden ? const [] : bars,
       );
     case PhoneWidgetContent.goal:
       final index = featuredGoalIndex([
@@ -125,6 +166,7 @@ PhoneWidgetPayload phoneWidgetPayload(
       if (index == null) {
         return PhoneWidgetPayload(
           theme: theme,
+          accent: accent,
           title: 'Metas',
           amount: '—',
           caption: 'Crea tu primera meta',
@@ -133,11 +175,12 @@ PhoneWidgetPayload phoneWidgetPayload(
       final goal = data.goals[index];
       return PhoneWidgetPayload(
         theme: theme,
+        accent: accent,
         title: goal.name,
         amount: '${goal.progressPercent.clamp(0, 100).round()}%',
         caption:
-            '${Formatters.compactMoney(goal.savedAmount)} de '
-            '${Formatters.compactMoney(goal.targetAmount)}',
+            '${money(goal.savedAmount)} de '
+            '${money(goal.targetAmount)}',
         progress: goal.progressPercent.clamp(0, 100).round(),
       );
   }

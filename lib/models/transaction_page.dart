@@ -5,6 +5,8 @@ import 'transaction.dart';
 /// [from]/[to] are calendar days in the user's time zone, both included.
 typedef HistoryQuery = ({
   String search,
+  String? categoryId,
+  String? paymentMethodId,
   TransactionType? type,
   DateTime? from,
   DateTime? to,
@@ -12,6 +14,8 @@ typedef HistoryQuery = ({
 
 const HistoryQuery noHistoryFilters = (
   search: '',
+  categoryId: null,
+  paymentMethodId: null,
   type: null,
   from: null,
   to: null,
@@ -19,12 +23,18 @@ const HistoryQuery noHistoryFilters = (
 
 extension HistoryQueryX on HistoryQuery {
   bool get hasFilters =>
-      search.trim().isNotEmpty || type != null || from != null || to != null;
+      search.trim().isNotEmpty ||
+      type != null ||
+      from != null ||
+      to != null ||
+      categoryId != null ||
+      paymentMethodId != null;
 
   /// The API's filters: local days become UTC instants.
   Map<String, String> get apiParams => {
     if (search.trim().isNotEmpty) 'q': search.trim(),
     if (type != null) 'type': type!.apiValue,
+    if (categoryId != null) 'categoryId': categoryId!,
     if (from case final f?)
       'from': DateTime(f.year, f.month, f.day).toUtc().toIso8601String(),
     if (to case final t?)

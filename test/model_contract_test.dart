@@ -16,10 +16,14 @@ void main() {
       'email': 'daniela@universidad.edu',
       'avatarUrl': null,
       'darkMode': false,
+      'themeMode': 'SYSTEM',
+      'accent': 'MINT',
       'createdAt': '2026-05-21T12:00:00.000Z',
       'updatedAt': '2026-05-21T12:00:00.000Z',
     });
     expect(user.name, 'Daniela');
+    expect(user.themeMode, 'SYSTEM');
+    expect(user.accent, 'MINT');
 
     final category = Category.fromJson({
       'id': 'cat-1',
@@ -208,14 +212,16 @@ void main() {
       'bgColor': 'bg-rose-500/10',
       'iconColor': 'text-rose-500',
       'progressPercent': 15,
+      'targetDate': '2027-06-30',
     });
     expect(goal.progressPercent, 15);
+    expect(goal.targetDate, DateTime(2027, 6, 30));
 
     final metric = SavingsEfficiency.fromJson({
       'totalIncome': 150,
       'totalSaved': 30,
       'efficiencyPercent': 20,
     });
-    expect(metric.message, contains('ahorro'));
+    expect(metric.message, contains('metas'));
   });
 }

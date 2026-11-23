@@ -18,6 +18,13 @@ class Env {
     defaultValue: 'https://gxgjbcywdsiguxfblyof.supabase.co',
   );
 
+  /// Where Supabase Auth links (password reset, email confirmation) send
+  /// the user back: the app's deep link. Registered in AndroidManifest.xml,
+  /// ios/Runner/Info.plist and the project's redirect URLs
+  /// (gastos-api/supabase/config.toml).
+  static const authRedirectUrl =
+      'io.github.carlosmartinezdev20.appgastos://auth-callback';
+
   static const supabasePublishableKey = String.fromEnvironment(
     'SUPABASE_PUBLISHABLE_KEY',
     defaultValue: 'sb_publishable_LtFjDnmHrx61_L3s4j4yLA_4fIfh4bB',

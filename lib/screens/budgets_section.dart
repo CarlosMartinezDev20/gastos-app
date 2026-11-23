@@ -1,3 +1,4 @@
+import '../widgets/money_privacy.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,7 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../core/theme/app_palette.dart';
-import '../core/utils/formatters.dart';
+import '../core/theme/app_theme.dart';
 import '../models/budget.dart';
 import '../providers/finance_providers.dart';
 import '../widgets/animated_progress.dart';
@@ -75,46 +76,65 @@ class _PlannerLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
-    return BentoCard(
-      color: palette.ink,
+    return _ActionCard(
+      icon: CupertinoIcons.slider_horizontal_3,
+      title: 'Calcular mis presupuestos',
+      subtitle: 'Reparte tu ingreso con la regla 50/30/20',
       onTap: () => context.push('/budget-planner'),
-      padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+    );
+  }
+}
+
+/// A tappable card with a lime icon tile, a title and a line of detail:
+/// the empty state and the calculator link share it so they line up.
+class _ActionCard extends StatelessWidget {
+  const _ActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final muted = palette.muted;
+    return BentoCard(
+      onTap: onTap,
+      padding: const EdgeInsets.fromLTRB(16, 16, 14, 16),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: palette.accent,
-              borderRadius: BorderRadius.circular(13),
+            width: 44,
+            height: 44,
+            decoration: ShapeDecoration(
+              color: palette.fill,
+              shape: AppTheme.continuous(12),
             ),
             child: Icon(
-              CupertinoIcons.slider_horizontal_3,
-              color: palette.onAccent,
-              size: 20,
+              icon,
+              color: Theme.of(context).colorScheme.onSurface,
+              size: 22,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Calcular mis presupuestos',
-                  style: TextStyle(
-                    color: palette.onInk,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  'Reparte tu ingreso con la regla 50/30/20',
-                  style: TextStyle(color: palette.inkMuted, fontSize: 13),
-                ),
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 2),
+                Text(subtitle, style: TextStyle(color: muted, fontSize: 13)),
               ],
             ),
           ),
-          Icon(CupertinoIcons.chevron_right, size: 16, color: palette.inkMuted),
+          const SizedBox(width: 8),
+          Icon(CupertinoIcons.chevron_right, size: 16, color: muted),
         ],
       ),
     );
@@ -132,19 +152,10 @@ class _BudgetRow extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final (color, status) = budget.exceeded
-        ? (
-            scheme.error,
-            'Te pasaste por ${Formatters.compactMoney(-budget.remaining)}',
-          )
+        ? (scheme.error, 'Te pasaste por ${context.money(-budget.remaining)}')
         : budget.nearLimit
-        ? (
-            const Color(0xFFF29D38),
-            'Quedan ${Formatters.compactMoney(budget.remaining)}',
-          )
-        : (
-            palette.chartIncome,
-            'Quedan ${Formatters.compactMoney(budget.remaining)}',
-          );
+        ? (const Color(0xFFF29D38), 'Quedan ${context.money(budget.remaining)}')
+        : (palette.chartIncome, 'Quedan ${context.money(budget.remaining)}');
     return InkWell(
       onTap: () => showBudgetSheet(context, budget: budget),
       child: Padding(
@@ -154,13 +165,13 @@ class _BudgetRow extends StatelessWidget {
             Container(
               width: 44,
               height: 44,
-              decoration: BoxDecoration(
-                color: palette.ink,
-                borderRadius: BorderRadius.circular(14),
+              decoration: ShapeDecoration(
+                color: palette.fill,
+                shape: AppTheme.continuous(12),
               ),
               child: Icon(
                 iconFromApi(budget.category.icon),
-                color: palette.onInk,
+                color: scheme.onSurface,
                 size: 22,
               ),
             ),
@@ -199,8 +210,8 @@ class _BudgetRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '$status · ${Formatters.compactMoney(budget.spent)} de '
-                    '${Formatters.compactMoney(budget.amount)}',
+                    '$status · ${context.money(budget.spent)} de '
+                    '${context.money(budget.amount)}',
                     style: text.bodySmall?.copyWith(color: palette.muted),
                   ),
                 ],
@@ -217,44 +228,10 @@ class _EmptyBudgets extends StatelessWidget {
   const _EmptyBudgets();
 
   @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return BentoCard(
-      onTap: () => showBudgetSheet(context),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: palette.accent,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(
-              CupertinoIcons.gauge,
-              color: palette.onAccent,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Ponle un límite a tus gastos',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                Text(
-                  'Por ejemplo, \$120 al mes en Comida.',
-                  style: TextStyle(color: palette.muted),
-                ),
-              ],
-            ),
-          ),
-          Icon(CupertinoIcons.chevron_right, size: 16, color: palette.muted),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => _ActionCard(
+    icon: CupertinoIcons.gauge,
+    title: 'Ponle un límite a tus gastos',
+    subtitle: 'Define un límite mensual para una categoría.',
+    onTap: () => showBudgetSheet(context),
+  );
 }

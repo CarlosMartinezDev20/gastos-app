@@ -1,3 +1,4 @@
+import '../widgets/money_privacy.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -41,7 +42,7 @@ class WalletScreen extends ConsumerWidget {
             child: CollapsingTitle(
               title: 'Mi wallet',
               onBack: () =>
-                  context.canPop() ? context.pop() : context.go('/profile'),
+                  context.canPop() ? context.pop() : context.go('/home'),
               child: RefreshIndicator(
                 onRefresh: () => Future.wait([
                   ref.refresh(paymentMethodsProvider.future),
@@ -63,14 +64,13 @@ class WalletScreen extends ConsumerWidget {
                           tooltip: 'Volver',
                           onPressed: () => context.canPop()
                               ? context.pop()
-                              : context.go('/profile'),
+                              : context.go('/home'),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
                     LargeTitle(
                       title: 'Mi wallet',
-                      subtitle: 'Tus tarjetas y formas de pago',
                       trailing: [
                         CircleButton(
                           icon: CupertinoIcons.add,
@@ -169,14 +169,12 @@ class _WalletEntry extends StatelessWidget {
                             : debt < 0
                             ? 'A favor'
                             : 'Deuda',
-                        value: debt == 0
-                            ? 'Al día'
-                            : Formatters.compactMoney(debt.abs()),
+                        value: debt == 0 ? 'Al día' : context.money(debt.abs()),
                       ),
                     if (summary.available case final available?)
                       _Fact(
                         label: available < 0 ? 'Sobre el límite' : 'Disponible',
-                        value: Formatters.compactMoney(available.abs()),
+                        value: context.money(available.abs()),
                         alert: available < 0,
                       ),
                     if (due != null)
@@ -198,10 +196,10 @@ class _WalletEntry extends StatelessWidget {
   }
 }
 
-String _debtLabel(double debt) => debt > 0
-    ? 'Debes ${Formatters.compactMoney(debt)}'
+String _debtLabel(BuildContext context, double debt) => debt > 0
+    ? 'Debes ${context.money(debt)}'
     : debt < 0
-    ? '${Formatters.compactMoney(-debt)} a favor'
+    ? '${context.money(-debt)} a favor'
     : 'Al día';
 
 class _Fact extends StatelessWidget {
@@ -280,18 +278,18 @@ class _WalletDetail extends ConsumerWidget {
       (
         CupertinoIcons.cart,
         summary.byStatement ? 'Gastado en este corte' : 'Gastado este mes',
-        Formatters.compactMoney(summary.spent),
+        context.money(summary.spent),
       ),
       if (summary.debt case final debt?)
-        (CupertinoIcons.money_dollar_circle, 'Deuda actual', _debtLabel(debt)),
-      if (summary.lastStatementSpent case final last? when last > 0)
         (
-          CupertinoIcons.doc_text,
-          'Último corte',
-          Formatters.compactMoney(last),
+          CupertinoIcons.money_dollar_circle,
+          'Deuda actual',
+          _debtLabel(context, debt),
         ),
+      if (summary.lastStatementSpent case final last? when last > 0)
+        (CupertinoIcons.doc_text, 'Último corte', context.money(last)),
       if (summary.limit case final limit?)
-        (CupertinoIcons.gauge, 'Límite', Formatters.compactMoney(limit)),
+        (CupertinoIcons.gauge, 'Límite', context.money(limit)),
       if (summary.closesOn case final close?)
         (CupertinoIcons.scissors, 'Fecha de corte', dayMonth.format(close)),
       if (summary.dueDate case final due?)
@@ -444,7 +442,9 @@ class _FixedPayments extends ConsumerWidget {
     Widget value(String text) => Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(text, style: TextStyle(color: palette.muted)),
+        Flexible(
+          child: Text(text, style: TextStyle(color: palette.muted)),
+        ),
         const SizedBox(width: 6),
         Icon(CupertinoIcons.chevron_right, size: 16, color: palette.muted),
       ],
@@ -458,15 +458,15 @@ class _FixedPayments extends ConsumerWidget {
           title: 'Suscripciones',
           trailing: value(
             active.isEmpty
-                ? 'Agregar'
-                : '${Formatters.compactMoney(monthlySubscriptionCost(subs))}/mes',
+                ? 'Ninguna'
+                : '${context.money(monthlySubscriptionCost(subs))}/mes',
           ),
           onTap: () => context.push('/subscriptions'),
         ),
         InsetTile(
           icon: CupertinoIcons.repeat,
           iconColor: const Color(0xFF3B82C4),
-          title: 'Movimientos recurrentes',
+          title: 'Recurrentes',
           trailing: value(
             others == 0
                 ? 'Ninguno'
@@ -573,9 +573,11 @@ class _CardPayments extends ConsumerWidget {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      Formatters.compactMoney(payment.amount),
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    Flexible(
+                      child: Text(
+                        context.money(payment.amount),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
                     ),
                     IconButton(
                       tooltip: 'Borrar pago',

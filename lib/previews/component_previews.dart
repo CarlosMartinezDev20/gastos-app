@@ -2,15 +2,18 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/theme/app_accent.dart';
 import '../core/theme/app_palette.dart';
 import '../core/utils/home_layout.dart';
 import '../core/utils/phone_widget.dart';
 import '../providers/finance_providers.dart';
+import '../widgets/accent_picker.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/app_states.dart';
 import '../widgets/home_cards.dart';
 import '../widgets/ios_ui.dart';
 import '../widgets/mascot.dart';
+import '../widgets/onboarding_tour.dart';
 import '../widgets/phone_widget_preview.dart';
 import '../widgets/theme_toggle.dart';
 import '../widgets/transaction_tile.dart';
@@ -38,6 +41,18 @@ Widget mascotMoods() => Padding(
 Widget dock() => Align(
   alignment: Alignment.bottomCenter,
   child: AppDock(location: '/home', onAdd: () {}),
+);
+
+/// The tour over the dock: "Siguiente" moves the highlight to the + button.
+@AppPreview(name: 'Recorrido', group: 'Navegación', size: Size(390, 700))
+Widget onboardingTour() => Stack(
+  children: [
+    Align(
+      alignment: Alignment.bottomCenter,
+      child: AppDock(location: '/home', onAdd: () {}),
+    ),
+    const Positioned.fill(child: OnboardingTourOverlay()),
+  ],
 );
 
 @AppPreview(
@@ -335,3 +350,10 @@ class _AmountDemoState extends State<_AmountDemo> {
     ),
   );
 }
+
+/// Perfil → Apariencia: the accent swatches, Violeta chosen.
+@AppPreview(name: 'Colores de acento', group: 'Controles', size: Size(390, 110))
+Widget accentPicker() => Padding(
+  padding: const EdgeInsets.all(16),
+  child: AccentPicker(selected: AppAccent.violeta, onChanged: (_) {}),
+);

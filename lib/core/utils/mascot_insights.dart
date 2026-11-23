@@ -1,10 +1,17 @@
 import '../../models/budget.dart';
 import '../../models/metrics.dart';
+import '../../models/savings_goal.dart';
+import '../../models/transaction.dart';
 import 'finance_insights.dart';
 import 'formatters.dart';
+import 'goal_plan.dart';
 
 /// How the mascot feels. Each mood has its own face and idle animation.
 enum MascotMood { happy, excited, calm, worried, sleepy }
+
+/// Something the mascot does once: a jump with hearts, a purring wiggle
+/// with notes, or a paw wave.
+enum MascotReaction { jump, wiggle, wave }
 
 /// What the mascot says: a mood plus messages it cycles through on tap.
 class MascotTip {
@@ -25,13 +32,52 @@ List<String> budgetMessages(List<Budget> budgets) => [
         '${b.category.name}.',
 ];
 
-/// Mascot reaction to the last 30 days of activity on the home screen.
+/// What the mascot says about goals with a date that are late or behind.
+List<String> goalMessages(
+  List<SavingsGoal> goals,
+  List<Transaction> transactions, {
+  required DateTime now,
+}) => [
+  for (final goal in goals)
+    if (goalPlan(goal, transactions, now: now) case final plan)
+      if (plan.status == GoalStatus.overdue)
+        'Se pasó la fecha de "${goal.name}". ¿Le ponemos una nueva?'
+      else if (plan.status == GoalStatus.behind)
+        'Para llegar a "${goal.name}" a tiempo aparta '
+            '${Formatters.compactMoney(plan.perMonth!)} al mes.',
+];
+
+/// Mascot reaction to the last 30 days of activity on the home screen;
+/// [goalAlerts] (see [goalMessages]) join its messages.
 MascotTip homeTip({
   required PeriodSummary month,
   required double balance,
   required bool hasActivity,
   required int goalCount,
   List<Budget> budgets = const [],
+  List<String> goalAlerts = const [],
+}) {
+  final tip = _homeTip(
+    month: month,
+    balance: balance,
+    hasActivity: hasActivity,
+    goalCount: goalCount,
+    budgets: budgets,
+  );
+  if (!hasActivity || goalAlerts.isEmpty) return tip;
+  return MascotTip(tip.mood, [
+    tip.messages.first,
+    ...goalAlerts,
+    ...tip.messages.skip(1),
+  ]);
+}
+
+MascotTip _homeTip({
+  required PeriodSummary month,
+  required double balance,
+  required bool hasActivity,
+  required int goalCount,
+  required List<Budget> budgets,
 }) {
   const goalTip = 'Un aporte pequeño cada semana a tus metas suma mucho.';
   if (!hasActivity) {
@@ -60,7 +106,17 @@ MascotTip homeTip({
       'Revisa en Análisis cuál es tu categoría más cara.',
     ]);
   }
-  final share = month.income == 0 ? 0.0 : month.spent / month.income;
+  // Nothing in or out these 30 days: a percent of nothing means nothing.
+  if (month.income == 0) {
+    return MascotTip(MascotMood.calm, [
+      'Estos 30 días están tranquilos. ¿Anotamos lo que gastaste?',
+      if (goalCount == 0)
+        'Crea una meta y guardamos juntos lo que sobra.'
+      else
+        goalTip,
+    ]);
+  }
+  final share = month.spent / month.income;
   final percent = (share * 100).round();
   if (month.income > 0 && month.saved >= month.income * .1) {
     return MascotTip(MascotMood.excited, [

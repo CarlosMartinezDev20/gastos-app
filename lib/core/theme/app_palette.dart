@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 
+import 'app_accent.dart';
+
 /// Semantic surfaces and foregrounds. Read with `context.palette`.
+///
+/// Neutrals follow Apple's system colors (grouped backgrounds, gray fills,
+/// separators; true black behind the cards in dark mode); the brand keeps its
+/// lime accent, black ink cards and pastel tiles on top of them.
 @immutable
 class AppPalette extends ThemeExtension<AppPalette> {
   const AppPalette({
@@ -18,11 +24,15 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.card,
     required this.thumb,
     required this.hairline,
+    required this.separator,
     required this.muted,
     required this.pill,
     required this.onPill,
     required this.chartIncome,
     required this.chartExpense,
+    required this.chartWants,
+    required this.positive,
+    required this.fill,
   });
 
   /// Dark summary surfaces (goals, efficiency, expense card).
@@ -52,7 +62,12 @@ class AppPalette extends ThemeExtension<AppPalette> {
   /// The selected segment of a segmented control: lighter than its track in
   /// both modes (the card color is darker than the track in dark mode).
   final Color thumb;
+
+  /// Borders around cards and controls.
   final Color hairline;
+
+  /// Thin list separators (iOS `separator`), drawn at [separatorWidth].
+  final Color separator;
   final Color muted;
 
   /// Primary action backgrounds and foregrounds.
@@ -64,6 +79,21 @@ class AppPalette extends ThemeExtension<AppPalette> {
   /// apart for color-blind eyes (light: deep lime vs ink; dark: lime vs grey).
   final Color chartIncome;
   final Color chartExpense;
+
+  /// Third series (the budget split's "gustos"): a lilac with 3:1 against
+  /// the card whose hue keeps it apart from the other two.
+  final Color chartWants;
+
+  /// Money coming in, as text (amounts in lists): a deep lime on light
+  /// backgrounds (4.5:1 on white), the lime itself on dark ones.
+  final Color positive;
+
+  /// iOS's tertiary system fill: secondary buttons, search fields and
+  /// tracks drawn on a card.
+  final Color fill;
+
+  /// An iOS hairline: thinner than one logical pixel.
+  static const separatorWidth = .5;
 
   static const light = AppPalette(
     ink: Color(0xFF1C1C1E),
@@ -79,16 +109,21 @@ class AppPalette extends ThemeExtension<AppPalette> {
     onLilac: Color(0xFF514578),
     card: Colors.white,
     thumb: Colors.white,
-    hairline: Color(0xFFECECEE),
-    muted: Color(0xFF64646D),
+    hairline: Color(0xFFE5E5EA),
+    separator: Color(0xFFC6C6C8),
+    // iOS secondaryLabel, a touch darker to keep 4.5:1 on the grouped grey.
+    muted: Color(0xFF6C6C70),
     pill: Color(0xFF202122),
     onPill: Colors.white,
     chartIncome: Color(0xFF6E9600),
     chartExpense: Color(0xFF1C1C1E),
+    chartWants: Color(0xFF7C6FD0),
+    positive: Color(0xFF3E7A00),
+    fill: Color(0x1F767680),
   );
 
   static const dark = AppPalette(
-    ink: Color(0xFF2A2B2E),
+    ink: Color(0xFF2C2C2E),
     onInk: Color(0xFFF7F7F8),
     inkMuted: Color(0xFFA1A1A8),
     accent: Color(0xFFC8F04B),
@@ -99,14 +134,46 @@ class AppPalette extends ThemeExtension<AppPalette> {
     onBlush: Color(0xFFF1BFC7),
     lilac: Color(0xFF353047),
     onLilac: Color(0xFFD4CBFF),
-    card: Color(0xFF212224),
-    thumb: Color(0xFF545558),
-    hairline: Color(0xFF353638),
+    card: Color(0xFF1C1C1E),
+    thumb: Color(0xFF636366),
+    hairline: Color(0xFF2C2C2E),
+    separator: Color(0xFF38383A),
     muted: Color(0xFFB4B5BB),
     pill: Color(0xFFEDEEF0),
     onPill: Color(0xFF202122),
     chartIncome: Color(0xFFC8F04B),
     chartExpense: Color(0xFF8E8E93),
+    chartWants: Color(0xFFB3A8FF),
+    positive: Color(0xFFC8F04B),
+    fill: Color(0x3D767680),
+  );
+
+  /// This palette tinted with [a]: the accent fills and the mint tiles
+  /// follow it; everything else (income green included) stays.
+  AppPalette withAccent(AppAccent a, {required bool dark}) => AppPalette(
+    ink: ink,
+    onInk: onInk,
+    inkMuted: inkMuted,
+    accent: a.accent,
+    onAccent: a.onAccent,
+    mint: dark ? a.mintDark : a.mintLight,
+    onMint: dark ? a.onMintDark : a.onMintLight,
+    blush: blush,
+    onBlush: onBlush,
+    lilac: lilac,
+    onLilac: onLilac,
+    card: card,
+    thumb: thumb,
+    hairline: hairline,
+    separator: separator,
+    muted: muted,
+    pill: pill,
+    onPill: onPill,
+    chartIncome: chartIncome,
+    chartExpense: chartExpense,
+    chartWants: chartWants,
+    positive: positive,
+    fill: fill,
   );
 
   @override
@@ -131,11 +198,15 @@ class AppPalette extends ThemeExtension<AppPalette> {
       card: c(card, other.card),
       thumb: c(thumb, other.thumb),
       hairline: c(hairline, other.hairline),
+      separator: c(separator, other.separator),
       muted: c(muted, other.muted),
       pill: c(pill, other.pill),
       onPill: c(onPill, other.onPill),
       chartIncome: c(chartIncome, other.chartIncome),
       chartExpense: c(chartExpense, other.chartExpense),
+      chartWants: c(chartWants, other.chartWants),
+      positive: c(positive, other.positive),
+      fill: c(fill, other.fill),
     );
   }
 }

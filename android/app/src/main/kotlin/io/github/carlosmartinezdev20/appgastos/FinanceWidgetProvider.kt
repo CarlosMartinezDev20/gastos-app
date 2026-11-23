@@ -1,4 +1,4 @@
-package com.example.appgastos
+package io.github.carlosmartinezdev20.appgastos
 
 import android.appwidget.AppWidgetManager
 import android.content.Context
@@ -22,7 +22,9 @@ class FinanceWidgetProvider : HomeWidgetProvider() {
 
   private data class Theme(val background: Int, val foreground: Int, val muted: Int, val highlight: Int)
 
-  // Same values as PhoneWidgetTheme in Dart.
+  // The app sends the colors already resolved for its accent ("background",
+  // "foreground", "muted", "highlight" as #AARRGGBB); this table is only the
+  // fallback for data saved by versions without accents (PhoneWidgetTheme with Lima).
   private val themes = mapOf(
     "light" to Theme(0xFFFFFFFF.toInt(), 0xFF1C1C1E.toInt(), 0xFF64646D.toInt(), 0xFF8DBF1F.toInt()),
     "dark" to Theme(0xFF1C1C1E.toInt(), 0xFFF7F7F8.toInt(), 0xFFA1A1A8.toInt(), 0xFFC8F04B.toInt()),
@@ -36,7 +38,9 @@ class FinanceWidgetProvider : HomeWidgetProvider() {
     appWidgetIds: IntArray,
     widgetData: SharedPreferences,
   ) {
-    val theme = themes[widgetData.getString("theme", null)] ?: themes.getValue("dark")
+    val theme = sentColors(widgetData)
+      ?: themes[widgetData.getString("theme", null)]
+      ?: themes.getValue("dark")
     val title = widgetData.getString("title", null) ?: "Finanzas"
     val amount = widgetData.getString("amount", null) ?: "—"
     val caption = widgetData.getString("caption", null) ?: "Abre la app para ver tus datos"
@@ -75,6 +79,22 @@ class FinanceWidgetProvider : HomeWidgetProvider() {
       }
       appWidgetManager.updateAppWidget(id, views)
     }
+  }
+
+  private fun sentColors(data: SharedPreferences): Theme? {
+    fun color(key: String) = data.getString(key, null)?.let {
+      try {
+        Color.parseColor(it)
+      } catch (_: IllegalArgumentException) {
+        null
+      }
+    }
+    return Theme(
+      color("background") ?: return null,
+      color("foreground") ?: return null,
+      color("muted") ?: return null,
+      color("highlight") ?: return null,
+    )
   }
 
   private fun withAlpha(color: Int, alpha: Float) =

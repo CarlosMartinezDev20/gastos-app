@@ -5,12 +5,15 @@ import 'package:go_router/go_router.dart';
 
 import '../core/theme/app_palette.dart';
 import '../core/utils/home_layout.dart';
+import '../core/utils/onboarding_tour.dart';
 import '../models/dashboard.dart';
 import '../providers/finance_providers.dart';
 import '../providers/home_layout_provider.dart';
 import '../widgets/app_states.dart';
 import '../widgets/home_cards.dart';
+import '../widgets/home_next_actions.dart';
 import '../widgets/ios_ui.dart';
+import '../widgets/onboarding_tour.dart';
 import 'customize_home_screen.dart';
 
 /// Content wider than this shows two columns.
@@ -29,72 +32,100 @@ class HomeScreen extends ConsumerWidget {
         message: error.toString(),
         onRetry: () => ref.invalidate(dashboardProvider),
       ),
-      data: (data) => RefreshIndicator(
-        onRefresh: () => Future.wait([
-          ref.refresh(dashboardProvider.future),
-          ref.refresh(budgetsProvider.future),
-        ]),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final wide = constraints.maxWidth >= _twoColumnMinWidth;
-            final blocks = [
-              for (final (i, block) in homeBlocks(layout).indexed)
-                FadeSlideIn(
-                  // A block keeps its state when the layout around it changes.
-                  key: ValueKey(block.map((c) => c.type.name).join('+')),
-                  index: i + 1,
-                  child: _Block(configs: block, data: data),
-                ),
-            ];
-            const gap = SizedBox(height: 14);
+      // The board fades out under a slim bar instead of being cut off at
+      // the status bar.
+      data: (data) => OnboardingTourStarter(
+        hasMovements: !_isEmpty(data),
+        child: CollapsingTitle(
+          title: 'Inicio',
+          child: RefreshIndicator(
+            // Everything Inicio's widgets show (wallet, budgets, recurring…).
+            onRefresh: () {
+              refreshFinance(ref);
+              return ref.read(dashboardProvider.future);
+            },
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final wide = constraints.maxWidth >= _twoColumnMinWidth;
+                final blocks = [
+                  for (final (i, block) in homeBlocks(layout).indexed)
+                    FadeSlideIn(
+                      // A block keeps its state when the layout around it changes.
+                      key: ValueKey(block.map((c) => c.type.name).join('+')),
+                      index: i + 1,
+                      child: _Block(configs: block, data: data),
+                    ),
+                ];
+                const gap = SizedBox(height: 14);
 
-            return ListView(
-              // Pull to refresh needs it even when the board is short.
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(20, 16, 20, dockClearance(context)),
-              children: [
-                FadeSlideIn(child: _Header(data: data)),
-                const SizedBox(height: 24),
-                if (blocks.isEmpty)
-                  const _EmptyBoard()
-                else if (wide)
-                  // Two columns: blocks alternate between them, in order.
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (final column in [0, 1]) ...[
-                        if (column == 1) const SizedBox(width: 24),
-                        Expanded(
-                          child: Column(
-                            children: [
-                              for (final (i, block) in blocks.indexed)
-                                if (i % 2 == column) ...[if (i > 1) gap, block],
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  )
-                else
-                  for (final (i, block) in blocks.indexed) ...[
-                    if (i > 0) gap,
-                    block,
-                  ],
-                const SizedBox(height: 12),
-                Center(
-                  child: TextButton.icon(
-                    onPressed: () => context.push('/customize-home'),
-                    icon: const Icon(CupertinoIcons.square_grid_2x2, size: 18),
-                    label: const Text('Personalizar inicio'),
+                return ListView(
+                  // Pull to refresh needs it even when the board is short.
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    16,
+                    20,
+                    dockClearance(context),
                   ),
-                ),
-              ],
-            );
-          },
+                  children: [
+                    FadeSlideIn(child: _Header(data: data)),
+                    const SizedBox(height: 24),
+                    if (_isEmpty(data)) const HomeGettingStarted(),
+                    const HomeNextActions(),
+                    if (blocks.isEmpty)
+                      const _EmptyBoard()
+                    else if (wide)
+                      // Two columns: blocks alternate between them, in order.
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (final column in [0, 1]) ...[
+                            if (column == 1) const SizedBox(width: 24),
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  for (final (i, block) in blocks.indexed)
+                                    if (i % 2 == column) ...[
+                                      if (i > 1) gap,
+                                      block,
+                                    ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      )
+                    else
+                      for (final (i, block) in blocks.indexed) ...[
+                        if (i > 0) gap,
+                        block,
+                      ],
+                    const SizedBox(height: 12),
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: () => context.push('/customize-home'),
+                        icon: const Icon(
+                          CupertinoIcons.square_grid_2x2,
+                          size: 18,
+                        ),
+                        label: const Text('Personalizar inicio'),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
         ),
       ),
     );
   }
+
+  /// Nothing recorded yet: a new account.
+  static bool _isEmpty(DashboardData data) =>
+      data.transactions.isEmpty &&
+      data.balance.totalIncome == 0 &&
+      data.balance.totalExpense == 0;
 }
 
 /// A wide widget, or two compact ones side by side with the same height.
@@ -107,20 +138,41 @@ class _Block extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget card(HomeWidgetConfig config) => GestureDetector(
-      onLongPress: () => showHomeWidgetSheet(context, config.type),
-      child: HomeCard(config: config, data: data),
-    );
+    Widget card(HomeWidgetConfig config) {
+      final widget = GestureDetector(
+        onLongPress: () => showHomeWidgetSheet(context, config.type),
+        child: HomeCard(config: config, data: data),
+      );
+      return config.type == HomeWidgetType.balance
+          ? TourTarget(spot: TourSpot.balance, child: widget)
+          : widget;
+    }
+
     if (configs.length == 1) return card(configs.single);
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(child: card(configs[0])),
-          const SizedBox(width: 12),
-          Expanded(child: card(configs[1])),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final largeText = MediaQuery.textScalerOf(context).scale(15) > 21;
+        if (constraints.maxWidth < 320 || largeText) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              card(configs[0]),
+              const SizedBox(height: 12),
+              card(configs[1]),
+            ],
+          );
+        }
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: card(configs[0])),
+              const SizedBox(width: 12),
+              Expanded(child: card(configs[1])),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -202,49 +254,33 @@ class _Header extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        CircleButton(
-          icon: CupertinoIcons.square_grid_2x2,
-          tooltip: 'Personalizar inicio',
-          onPressed: () => context.push('/customize-home'),
+        TourTarget(
+          spot: TourSpot.customize,
+          child: CircleButton(
+            icon: CupertinoIcons.square_grid_2x2,
+            tooltip: 'Personalizar inicio',
+            onPressed: () => context.push('/customize-home'),
+          ),
         ),
         const SizedBox(width: 8),
-        CircleButton(
-          icon: CupertinoIcons.creditcard,
-          tooltip: 'Mi wallet',
-          onPressed: () => context.push('/wallet'),
+        TourTarget(
+          spot: TourSpot.wallet,
+          child: CircleButton(
+            icon: CupertinoIcons.creditcard,
+            tooltip: 'Mi wallet',
+            onPressed: () => context.push('/wallet'),
+          ),
         ),
         const SizedBox(width: 8),
-        Tooltip(
-          message: 'Perfil',
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: () => context.go('/profile'),
-            // Avatar with a lime ring, like the selected profile tab; as tall
-            // as the buttons beside it.
-            child: Container(
-              width: 44,
-              height: 44,
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: palette.accent, width: 2),
-              ),
-              child: CircleAvatar(
-                backgroundColor: palette.pill,
-                child: FittedBox(
-                  child: Padding(
-                    padding: const EdgeInsets.all(6),
-                    child: Text(
-                      initials,
-                      style: TextStyle(
-                        color: palette.onPill,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+        TourTarget(
+          spot: TourSpot.profile,
+          child: Tooltip(
+            message: 'Perfil',
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => context.go('/profile'),
+              // As tall as the buttons beside it.
+              child: InitialsAvatar(initials: initials),
             ),
           ),
         ),

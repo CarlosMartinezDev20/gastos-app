@@ -1,9 +1,13 @@
 # Copy to android/key.properties (ignored by git) to sign release builds.
-# Create the key once and keep a backup — losing it means you can't update
-# the app on Play Store:
-#   keytool -genkey -v -keystore ~/finanzas-release.jks -keyalg RSA \
-#     -keysize 2048 -validity 10000 -alias finanzas
-storeFile=/home/USUARIO/finanzas-release.jks
+# Create the upload key ONCE, outside the repo, and back it up (with its
+# passwords) somewhere safe: losing it means asking Google to reset it.
+#
+#   keytool -genkeypair -v -keystore ~/.config/appgastos/finomiau-upload.jks \
+#     -storetype PKCS12 -keyalg RSA -keysize 2048 -validity 10000 \
+#     -alias finomiau-upload
+#
+# keytool asks for a password (PKCS12 uses the same one for the key).
+storeFile=/home/USUARIO/.config/appgastos/finomiau-upload.jks
 storePassword=CAMBIAR
-keyAlias=finanzas
+keyAlias=finomiau-upload
 keyPassword=CAMBIAR

@@ -1,3 +1,4 @@
+import 'money_privacy_provider.dart';
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import '../services/phone_widget_service.dart';
 import 'auth_provider.dart';
 import 'finance_providers.dart';
 import 'storage_provider.dart';
+import 'theme_provider.dart';
 
 final phoneWidgetServiceProvider = Provider<PhoneWidgetService>(
   (ref) => const PhoneWidgetService(),
@@ -66,8 +68,8 @@ final phoneWidgetPayloadProvider = Provider<PhoneWidgetPayload?>((ref) {
     data,
     content: settings.content,
     theme: settings.theme,
-    balanceHidden:
-        ref.watch(sharedPreferencesProvider).getBool(balanceHiddenKey) ?? false,
+    accent: ref.watch(accentControllerProvider),
+    balanceHidden: ref.watch(moneyPrivacyProvider),
     now: DateTime.now(),
   );
 });

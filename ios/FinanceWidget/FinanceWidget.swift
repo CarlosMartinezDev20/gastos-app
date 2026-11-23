@@ -5,11 +5,14 @@ import WidgetKit
 // lib/core/utils/phone_widget.dart) through the App Group below; this only
 // lays them out with the chosen colors. Setup steps: ios/FinanceWidget/README.md
 
-private let appGroupId = "group.com.example.appgastos"
+private let appGroupId = "group.io.github.carlosmartinezdev20.appgastos"
 
 struct FinanceEntry: TimelineEntry {
   let date: Date
   let theme: String
+  /// The colors resolved for the app's accent (#AARRGGBB); nil in data saved
+  /// by versions without accents, which use the table in WidgetColors.
+  let sentColors: [String: String]?
   let title: String
   let amount: String
   let caption: String
@@ -17,7 +20,7 @@ struct FinanceEntry: TimelineEntry {
   let bars: [Double]
 
   static let placeholder = FinanceEntry(
-    date: Date(), theme: "dark", title: "Balance disponible", amount: "$232.96",
+    date: Date(), theme: "dark", sentColors: nil, title: "Balance disponible", amount: "$232.96",
     caption: "Gastos 30 días: $70.54", progress: -1,
     bars: [0.2, 0.4, 1, 0.1, 0.1, 0.1, 0.3])
 
@@ -26,6 +29,14 @@ struct FinanceEntry: TimelineEntry {
     return FinanceEntry(
       date: Date(),
       theme: data?.string(forKey: "theme") ?? "dark",
+      sentColors: {
+        var colors: [String: String] = [:]
+        for key in ["background", "foreground", "muted", "highlight"] {
+          guard let value = data?.string(forKey: key) else { return nil }
+          colors[key] = value
+        }
+        return colors
+      }(),
       title: data?.string(forKey: "title") ?? "Finanzas",
       amount: data?.string(forKey: "amount") ?? "—",
       caption: data?.string(forKey: "caption") ?? "Abre la app para ver tus datos",
@@ -48,15 +59,26 @@ struct Provider: TimelineProvider {
   }
 }
 
-/// Same values as PhoneWidgetTheme in Dart.
+/// The colors the app sent, or, for data saved by versions without accents,
+/// the same values as PhoneWidgetTheme with Lima in Dart.
 struct WidgetColors {
   let background: Color
   let foreground: Color
   let muted: Color
   let highlight: Color
 
-  init(_ theme: String) {
-    switch theme {
+  init(_ entry: FinanceEntry) {
+    if let sent = entry.sentColors,
+      let background = Color(argbHex: sent["background"]),
+      let foreground = Color(argbHex: sent["foreground"]),
+      let muted = Color(argbHex: sent["muted"]),
+      let highlight = Color(argbHex: sent["highlight"])
+    {
+      (self.background, self.foreground, self.muted, self.highlight) =
+        (background, foreground, muted, highlight)
+      return
+    }
+    switch entry.theme {
     case "light":
       (background, foreground, muted, highlight) =
         (Color(hex: 0xFFFFFF), Color(hex: 0x1C1C1E), Color(hex: 0x64646D), Color(hex: 0x8DBF1F))
@@ -74,6 +96,19 @@ struct WidgetColors {
 }
 
 extension Color {
+  /// "#AARRGGBB", as the app sends it.
+  init?(argbHex: String?) {
+    guard let argbHex, argbHex.hasPrefix("#"), argbHex.count == 9,
+      let value = UInt32(argbHex.dropFirst(), radix: 16)
+    else { return nil }
+    self.init(
+      .sRGB,
+      red: Double((value >> 16) & 0xFF) / 255,
+      green: Double((value >> 8) & 0xFF) / 255,
+      blue: Double(value & 0xFF) / 255,
+      opacity: Double((value >> 24) & 0xFF) / 255)
+  }
+
   init(hex: UInt32) {
     self.init(
       red: Double((hex >> 16) & 0xFF) / 255,
@@ -86,7 +121,7 @@ struct FinanceWidgetView: View {
   let entry: FinanceEntry
 
   var body: some View {
-    let colors = WidgetColors(entry.theme)
+    let colors = WidgetColors(entry)
     VStack(alignment: .leading, spacing: 4) {
       HStack(spacing: 6) {
         Image(systemName: "dollarsign.circle").font(.caption)

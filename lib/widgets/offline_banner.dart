@@ -23,7 +23,7 @@ class OfflineBanner extends ConsumerWidget {
         child: AnimatedSlide(
           offset: isOffline ? Offset.zero : const Offset(0, -1.5),
           duration: Motion.of(context, Motion.medium),
-          curve: isOffline ? Motion.standard : Motion.exit,
+          curve: Motion.standard,
           child: AnimatedOpacity(
             opacity: isOffline ? 1 : 0,
             duration: Motion.of(context, Motion.medium),

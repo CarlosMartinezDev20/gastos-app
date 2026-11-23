@@ -106,6 +106,56 @@ void main() {
     },
   );
 
+  test(
+    'keeps only the latest answers and skips searches and later pages',
+    () async {
+      final prefs = await SharedPreferences.getInstance();
+      final api = ApiClient(
+        FakeAuthGateway(jwt('u1')),
+        ResponseCache(prefs, maxEntries: 2),
+      );
+      final network = _Network()..body = ['ok'];
+      api.dio.httpClientAdapter = network;
+      List<String> saved() =>
+          prefs.getKeys().where((k) => k.startsWith('api_cache:')).toList()
+            ..sort();
+
+      await api.dio.get('/transactions/page', queryParameters: {'q': 'caf'});
+      await api.dio.get(
+        '/transactions/page',
+        queryParameters: {'cursor': '2026-09-01T00:00:00.000Z_t1'},
+      );
+      expect(saved(), isEmpty);
+
+      await api.dio.get('/budgets');
+      await api.dio.get('/categories');
+      await api.dio.get('/budgets'); // used again: now the newest
+      await api.dio.get('/transactions');
+      expect(saved(), [
+        'api_cache:u1:/budgets?',
+        'api_cache:u1:/transactions?',
+      ]);
+
+      await api.clearToken();
+      expect(prefs.getKeys(), isNot(contains('api_cache_order')));
+    },
+  );
+
+  test('drops what older versions saved without an index', () async {
+    SharedPreferences.setMockInitialValues({
+      'api_cache:u1:/transactions/page?q=a': '[]',
+      'api_cache:u1:/transactions/page?q=ab': '[]',
+      'balance_hidden': true,
+    });
+    final (api, _, prefs) = await client('u1');
+    await api.dio.get('/budgets');
+    expect(prefs.getKeys(), {
+      'api_cache:u1:/budgets?',
+      'api_cache_order',
+      'balance_hidden',
+    });
+  });
+
   test('tokenSubject reads the user id of a JWT', () {
     expect(tokenSubject(jwt('u1')), 'u1');
     expect(tokenSubject('no-es-un-jwt'), isNull);

@@ -1,13 +1,17 @@
+import 'package:appgastos/services/transaction_draft_store.dart';
+import 'package:appgastos/core/utils/formatters.dart';
 import 'package:appgastos/core/network/api_client.dart';
 import 'package:appgastos/core/auth/auth_gateway.dart';
 import 'package:appgastos/core/errors/api_exception.dart';
 import 'package:appgastos/core/theme/app_theme.dart';
 import 'package:appgastos/main.dart';
 import 'package:appgastos/models/transaction.dart';
+import 'package:appgastos/core/utils/onboarding_tour.dart';
 import 'package:appgastos/core/utils/receipt_scan.dart';
 import 'package:appgastos/models/category.dart';
 import 'package:appgastos/models/payment_method.dart';
 import 'package:appgastos/core/utils/budget_planner.dart';
+import 'package:appgastos/providers/app_lock_provider.dart';
 import 'package:appgastos/providers/auth_provider.dart';
 import 'package:appgastos/providers/finance_providers.dart';
 import 'package:appgastos/providers/payment_reminders_provider.dart';
@@ -40,6 +44,10 @@ Future<FakeBackend> pumpApp(
   FakePhoneWidgetService? phoneWidget,
   ScanDraft? scan,
   FakePaymentReminderService? reminders,
+  FakeBiometricAuth? biometrics,
+  Map<String, Object> prefs = const {},
+  TransactionDraftStore? drafts,
+  bool tour = false,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -48,16 +56,26 @@ Future<FakeBackend> pumpApp(
   final backend = FakeBackend(withData: withData);
   if (loggedIn) backend.token = 'token';
   backend.profileError = startupError;
-  SharedPreferences.setMockInitialValues({});
-  final prefs = await SharedPreferences.getInstance();
+  // The first-run tour covers Inicio; only its own tests show it.
+  SharedPreferences.setMockInitialValues({
+    if (!tour) ...{
+      onboardingDoneKey('u1'): true,
+      onboardingDoneKey('u2'): true,
+    },
+    ...prefs,
+  });
+  final preferences = await SharedPreferences.getInstance();
 
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        sharedPreferencesProvider.overrideWithValue(prefs),
+        transactionDraftStoreProvider.overrideWithValue(
+          drafts ?? FakeTransactionDraftStore(),
+        ),
+        sharedPreferencesProvider.overrideWithValue(preferences),
         // No Supabase in tests: the session lives in memory.
         authGatewayProvider.overrideWithValue(
-          FakeAuthGateway(loggedIn ? 'token' : null),
+          backend.gateway = FakeAuthGateway(loggedIn ? 'token' : null),
         ),
         authRepositoryProvider.overrideWithValue(FakeAuthRepository(backend)),
         financeRepositoryProvider.overrideWithValue(
@@ -70,6 +88,9 @@ Future<FakeBackend> pumpApp(
         scanLauncherProvider.overrideWithValue((_) async => scan),
         paymentReminderServiceProvider.overrideWithValue(
           reminders ?? FakePaymentReminderService(),
+        ),
+        biometricAuthProvider.overrideWithValue(
+          biometrics ?? FakeBiometricAuth(),
         ),
       ],
       child: const AppGastosApp(),
@@ -128,6 +149,24 @@ Future<void> goBack(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// Direct fixture changes simulate a server update after Inicio loaded its data.
+Future<void> refreshBackend(WidgetTester tester) async {
+  refreshFinanceIn(
+    ProviderScope.containerOf(tester.element(find.byType(AppGastosApp))),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> selectExpenseCategory(WidgetTester tester) async {
+  final category = find.widgetWithText(ChoiceChip, 'Comida');
+  if (!tester.widget<ChoiceChip>(category).selected) {
+    await tester.ensureVisible(category);
+    await tester.pumpAndSettle();
+    await tester.tap(category);
+    await tester.pumpAndSettle();
+  }
+}
+
 void main() {
   setUpAll(() async {
     // A tap that lands on another widget (e.g. a button hidden behind the
@@ -166,6 +205,98 @@ void main() {
     expect(backend.calls.where((c) => c == 'login'), hasLength(2));
     expect(find.text('Balance disponible'), findsOneWidget);
     expect(find.text(r'$141.50'), findsOneWidget);
+  });
+
+  testWidgets('asks for a reset link from the login', (tester) async {
+    final backend = await pumpApp(tester, loggedIn: false);
+    await scrollTo(tester, find.text('Comenzar'));
+    await tester.tap(find.text('Comenzar'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Correo'),
+      'daniela@universidad.edu',
+    );
+    await tester.tap(find.text('¿Olvidaste tu contraseña?'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Recuperar contraseña'), findsWidgets);
+    // The email typed in the login comes along.
+    expect(find.text('daniela@universidad.edu'), findsOneWidget);
+
+    backend.authError = const ApiException(
+      'Demasiados intentos, espera un momento',
+    );
+    await tester.tap(find.text('Enviar enlace'));
+    await tester.pumpAndSettle();
+    expect(find.text('Demasiados intentos, espera un momento'), findsOneWidget);
+
+    backend.authError = null;
+    await tester.tap(find.text('Enviar enlace'));
+    await tester.pumpAndSettle();
+    expect(backend.calls, contains('reset:daniela@universidad.edu'));
+    expect(find.textContaining('te enviamos un enlace'), findsOneWidget);
+    expect(find.text('Enviar de nuevo'), findsOneWidget);
+  });
+
+  testWidgets('a reset link asks for the new password, then enters', (
+    tester,
+  ) async {
+    final backend = await pumpApp(tester, loggedIn: false);
+    backend.links.add(AuthLinkEvent.passwordRecovery);
+    await tester.pumpAndSettle();
+    expect(find.text('Contraseña nueva'), findsWidgets);
+
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), 'corta');
+    await tester.tap(find.text('Guardar contraseña'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mínimo 8 caracteres'), findsOneWidget);
+
+    await tester.enterText(fields.at(0), 'nuevaClave9');
+    await tester.enterText(fields.at(1), 'otraClave9');
+    await tester.tap(find.text('Guardar contraseña'));
+    await tester.pumpAndSettle();
+    expect(find.text('Las contraseñas no coinciden'), findsOneWidget);
+
+    await tester.enterText(fields.at(1), 'nuevaClave9');
+    await tester.tap(find.text('Guardar contraseña'));
+    await tester.pumpAndSettle();
+    expect(backend.password, 'nuevaClave9');
+    expect(find.text('Balance disponible'), findsOneWidget);
+  });
+
+  testWidgets('an unconfirmed account can resend the email, then sign in', (
+    tester,
+  ) async {
+    final backend = await pumpApp(tester, loggedIn: false);
+    backend.unconfirmed = true;
+    await scrollTo(tester, find.text('Comenzar'));
+    await tester.tap(find.text('Comenzar'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Correo'),
+      'daniela@universidad.edu',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Contraseña'),
+      'daniela123',
+    );
+    await tester.tap(find.text('Iniciar sesión').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Confirma tu correo'), findsOneWidget);
+
+    await scrollTo(tester, find.text('Reenviar correo'));
+    await tester.tap(find.text('Reenviar correo'));
+    await tester.pumpAndSettle();
+    expect(backend.calls, contains('resend:daniela@universidad.edu'));
+    expect(find.text('Listo, te lo enviamos otra vez.'), findsOneWidget);
+
+    // The link was opened: signing in works now.
+    backend.unconfirmed = false;
+    await scrollTo(tester, find.text('Iniciar sesión').last);
+    await tester.tap(find.text('Iniciar sesión').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Balance disponible'), findsOneWidget);
   });
 
   testWidgets('keeps the session when the server fails at startup', (
@@ -421,6 +552,7 @@ void main() {
       find.widgetWithText(TextFormField, 'Descripción'),
       'Café',
     );
+    await selectExpenseCategory(tester);
     await tester.tap(find.text('Guardar gasto'));
     await tester.pumpAndSettle();
 
@@ -459,6 +591,7 @@ void main() {
     expect(find.text('Pollo Campero'), findsOneWidget);
     expect(find.text('Ayer'), findsOneWidget);
     await scrollTo(tester, find.text('Guardar gasto'));
+    await selectExpenseCategory(tester);
     await tester.tap(find.text('Guardar gasto'));
     await tester.pumpAndSettle();
 
@@ -476,6 +609,7 @@ void main() {
     await tester.tap(find.byTooltip('Escanear factura o ticket'));
     await tester.pumpAndSettle();
     await scrollTo(tester, find.text('Guardar gasto'));
+    await selectExpenseCategory(tester);
     await tester.tap(find.text('Guardar gasto'));
     await tester.pumpAndSettle();
     expect(find.text('¿Registrarlo de nuevo?'), findsOneWidget);
@@ -505,6 +639,7 @@ void main() {
     await tester.tap(find.byTooltip('Escanear factura o ticket'));
     await tester.pumpAndSettle();
     await scrollTo(tester, find.text('Guardar gasto'));
+    await selectExpenseCategory(tester);
     await tester.tap(find.text('Guardar gasto'));
     await tester.pumpAndSettle();
 
@@ -517,6 +652,7 @@ void main() {
 
     backend.saveError = null;
     await scrollTo(tester, find.text('Guardar gasto'));
+    await selectExpenseCategory(tester);
     await tester.tap(find.text('Guardar gasto'));
     await tester.pumpAndSettle();
     expect(backend.transactions, hasLength(count + 1));
@@ -537,6 +673,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Escribe el monto'), findsOneWidget);
     await scrollTo(tester, find.text('Guardar gasto'));
+    await selectExpenseCategory(tester);
     await tester.tap(find.text('Guardar gasto'));
     await tester.pumpAndSettle();
     // Still on the form: the amount is required.
@@ -601,6 +738,7 @@ void main() {
     await tester.tap(find.text('Visa Agrícola ··4821'));
     await tester.pumpAndSettle();
     await scrollTo(tester, find.text('Guardar gasto'));
+    await selectExpenseCategory(tester);
     await tester.tap(find.text('Guardar gasto'));
     await tester.pumpAndSettle();
     expect(backend.transactions.last.paymentMethodId, card.id);
@@ -659,6 +797,47 @@ void main() {
     expect(find.text(r'Ahorrado $70.00'), findsOneWidget);
   });
 
+  testWidgets('gives a goal a target date and shows what it takes', (
+    tester,
+  ) async {
+    final backend = await pumpApp(tester);
+    await goToTab(tester, 'Metas');
+    await tester.tap(find.byTooltip('Opciones de la meta'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Editar'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Fecha objetivo'));
+    await tester.pumpAndSettle();
+    // The picker opens six months ahead; pick the 15th of that month.
+    final now = DateTime.now();
+    final shown = DateTime(now.year, now.month + 6, now.day);
+    final day = DateTime(shown.year, shown.month, 15);
+    await tester.tap(find.text('15'));
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    final label = Formatters.dayMonthYear.format(day);
+    expect(find.text(label), findsOneWidget);
+    expect(find.textContaining('al mes ('), findsOneWidget);
+
+    await tester.tap(find.text('Guardar cambios'));
+    await tester.pumpAndSettle();
+    expect(backend.goals.single.targetDate, day);
+    expect(find.textContaining('Para el $label'), findsOneWidget);
+
+    // And it can be cleared again.
+    await tester.tap(find.byTooltip('Opciones de la meta'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Editar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Quitar fecha'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Guardar cambios'));
+    await tester.pumpAndSettle();
+    expect(backend.goals.single.targetDate, isNull);
+    expect(find.textContaining('Para el'), findsNothing);
+  });
+
   testWidgets('deleting a goal returns its money to the balance', (
     tester,
   ) async {
@@ -696,6 +875,63 @@ void main() {
     await tester.pumpAndSettle();
     expect(backend.calls, contains('logout'));
     expect(find.text('Comenzar'), findsOneWidget);
+  });
+
+  testWidgets('the system back returns to Inicio before leaving the app', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    final exits = <MethodCall>[];
+    // With Android's predictive back the system only hands back to Flutter
+    // while the app says it handles it; otherwise it closes the app.
+    bool? handlesBack;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'SystemNavigator.pop') exits.add(call);
+        if (call.method == 'SystemNavigator.setFrameworkHandlesBack') {
+          handlesBack = call.arguments as bool;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    // The app only reports it once it's running.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    bool atHome() => find.byTooltip('Perfil').evaluate().isNotEmpty;
+
+    // From a tab: back goes to Inicio, not out of the app.
+    await goToTab(tester, 'Historial');
+    expect(find.byTooltip('Exportar CSV'), findsOneWidget);
+    expect(handlesBack, isTrue);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(atHome(), isTrue);
+    expect(exits, isEmpty);
+
+    // Perfil (opened from the avatar) has its own back button too.
+    await openProfile(tester);
+    expect(find.text('Editar nombre'), findsOneWidget);
+    expect(handlesBack, isTrue);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(atHome(), isTrue);
+    await openProfile(tester);
+    await tester.tap(find.byTooltip('Volver'));
+    await tester.pumpAndSettle();
+    expect(atHome(), isTrue);
+    expect(exits, isEmpty);
+
+    // Only from Inicio does back leave the app.
+    expect(handlesBack, isFalse);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(exits, hasLength(1));
   });
 
   testWidgets('Historial loads a page at a time with totals of all', (
@@ -901,12 +1137,92 @@ void main() {
   testWidgets('remembers a hidden balance', (tester) async {
     await pumpApp(tester);
     expect(find.text(r'$141.50'), findsOneWidget);
-    await tester.tap(find.byTooltip('Ocultar balance'));
+    await tester.tap(find.byTooltip('Ocultar importes'));
     await tester.pumpAndSettle();
     expect(find.text(r'$141.50'), findsNothing);
     await goToTab(tester, 'Metas');
     await goToTab(tester, 'Inicio');
-    expect(find.text('••••••'), findsOneWidget);
+    expect(find.text('••••••'), findsWidgets);
+  });
+
+  testWidgets('the fingerprint lock is turned on and opens the app', (
+    tester,
+  ) async {
+    final biometrics = FakeBiometricAuth(pass: false);
+    final backend = await pumpApp(tester, biometrics: biometrics);
+    await openProfile(tester);
+    await scrollTo(tester, find.text('Bloqueo con huella o rostro'));
+    Finder lockSwitch() => find.descendant(
+      of: find.widgetWithText(InsetTile, 'Bloqueo con huella o rostro'),
+      matching: find.byType(CupertinoSwitch),
+    );
+
+    // Failing the fingerprint leaves it off.
+    await tester.tap(lockSwitch());
+    await tester.pumpAndSettle();
+    expect(tester.widget<CupertinoSwitch>(lockSwitch()).value, isFalse);
+    expect(find.textContaining('No se activó'), findsOneWidget);
+
+    biometrics.pass = true;
+    await tester.tap(lockSwitch());
+    await tester.pumpAndSettle();
+    expect(tester.widget<CupertinoSwitch>(lockSwitch()).value, isTrue);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool(appLockKey), isTrue);
+    expect(backend.calls, isNot(contains('login')));
+  });
+
+  testWidgets('opening the app with the lock on asks first', (tester) async {
+    final biometrics = FakeBiometricAuth(pass: false);
+    await pumpApp(tester, biometrics: biometrics, prefs: {appLockKey: true});
+    // Asked at once; failed, so the app stays covered.
+    expect(biometrics.prompts, 1);
+    expect(find.text('Miaunero está bloqueada'), findsOneWidget);
+
+    biometrics.pass = true;
+    await tester.tap(find.bySemanticsLabel('Desbloquear'));
+    await tester.pumpAndSettle();
+    expect(find.text('Miaunero está bloqueada'), findsNothing);
+    expect(find.text('Balance disponible'), findsOneWidget);
+  });
+
+  testWidgets('the lock screen can sign out instead', (tester) async {
+    await pumpApp(
+      tester,
+      biometrics: FakeBiometricAuth(pass: false),
+      prefs: {appLockKey: true},
+    );
+    await tester.tap(find.text('Cerrar sesión'));
+    await tester.pumpAndSettle();
+    expect(find.text('Miaunero está bloqueada'), findsNothing);
+    expect(find.text('Comenzar'), findsOneWidget);
+  });
+
+  testWidgets('signing in with the password does not ask for the lock', (
+    tester,
+  ) async {
+    final biometrics = FakeBiometricAuth(pass: false);
+    await pumpApp(
+      tester,
+      loggedIn: false,
+      biometrics: biometrics,
+      prefs: {appLockKey: true},
+    );
+    await scrollTo(tester, find.text('Comenzar'));
+    await tester.tap(find.text('Comenzar'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Correo'),
+      'daniela@universidad.edu',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Contraseña'),
+      'daniela123',
+    );
+    await tester.tap(find.text('Iniciar sesión').last);
+    await tester.pumpAndSettle();
+    expect(biometrics.prompts, 0);
+    expect(find.text('Balance disponible'), findsOneWidget);
   });
 
   testWidgets('payment reminders are scheduled once turned on', (tester) async {
@@ -933,6 +1249,7 @@ void main() {
         paymentMethodId: 'visa',
       ),
     );
+    await refreshBackend(tester);
     await openProfile(tester);
     await scrollTo(tester, find.text('Recordatorios de pago'));
     Finder reminderSwitch() => find.descendant(
@@ -1057,6 +1374,7 @@ void main() {
         paymentMethodId: 'visa',
       ),
     );
+    await refreshBackend(tester);
     await tester.tap(find.byTooltip('Personalizar inicio'));
     await tester.pumpAndSettle();
     await scrollTo(tester, find.byTooltip('Añadir Tarjetas'));
@@ -1138,16 +1456,16 @@ void main() {
     expect(phoneWidget.payloads.last.theme.name, 'dark');
 
     // Hiding the balance on Inicio hides it on the phone too.
-    await tester.tap(find.byTooltip('Ocultar balance'));
+    await tester.tap(find.byTooltip('Ocultar importes'));
     await tester.pumpAndSettle();
     expect(phoneWidget.payloads.last.amount, '••••••');
 
     await tester.tap(find.byTooltip('Personalizar inicio'));
     await tester.pumpAndSettle();
     await scrollTo(tester, find.text('Widget del teléfono'));
-    await scrollTo(tester, find.byTooltip('Lima'));
+    await scrollTo(tester, find.byTooltip('Acento'));
     await tester.tap(find.text('Meta'));
-    await tester.tap(find.byTooltip('Lima'));
+    await tester.tap(find.byTooltip('Acento'));
     await tester.pumpAndSettle();
     expect(
       find.descendant(
@@ -1201,9 +1519,13 @@ void main() {
       find.widgetWithText(TextFormField, 'Descripción'),
       'Spotify',
     );
+    await scrollTo(tester, find.text('Repetir movimiento'));
+    await tester.tap(find.text('Repetir movimiento'));
+    await tester.pumpAndSettle();
     await scrollTo(tester, find.text('Cada mes'));
     await tester.tap(find.text('Cada mes'));
     await tester.pumpAndSettle();
+    await selectExpenseCategory(tester);
     await tester.tap(find.text('Guardar gasto'));
     await tester.pumpAndSettle();
     expect(backend.calls, contains('createRecurring:Spotify:monthly'));
@@ -1256,6 +1578,7 @@ void main() {
         paymentMethodId: 'visa',
       ),
     );
+    await refreshBackend(tester);
     final balance = backend.balance;
 
     await openWallet(tester);
@@ -1303,6 +1626,7 @@ void main() {
         last4: '0937',
       ),
     );
+    await refreshBackend(tester);
     await tester.tap(find.byTooltip('Registrar movimiento'));
     await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextFormField, 'Monto'), '9');
@@ -1313,10 +1637,14 @@ void main() {
     await scrollTo(tester, find.text('Débito ··0937'));
     await tester.tap(find.text('Débito ··0937'));
     await tester.pumpAndSettle();
+    await scrollTo(tester, find.text('Repetir movimiento'));
+    await tester.tap(find.text('Repetir movimiento'));
+    await tester.pumpAndSettle();
     await scrollTo(tester, find.text('Cada mes'));
     await tester.tap(find.text('Cada mes'));
     await tester.pumpAndSettle();
     await scrollTo(tester, find.text('Guardar gasto'));
+    await selectExpenseCategory(tester);
     await tester.tap(find.text('Guardar gasto'));
     await tester.pumpAndSettle();
     expect(backend.recurring.single.paymentMethodId, 'pm1');

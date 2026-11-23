@@ -1,7 +1,27 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/env.dart';
 import '../errors/api_exception.dart';
+
+/// What an Auth link opened in the app did (supabase_flutter reads the
+/// deep link and starts the session).
+enum AuthLinkEvent {
+  /// A password reset link: the user must choose a new password now.
+  passwordRecovery,
+
+  /// Signed in from a link (e.g. confirming the email).
+  signedIn,
+}
+
+/// The account exists but its email isn't confirmed yet (only when email
+/// confirmation is on in Supabase Auth).
+class EmailNotConfirmedException extends ApiException {
+  const EmailNotConfirmedException(this.email)
+    : super('Confirma tu correo para entrar. Te enviamos un enlace a $email.');
+
+  final String email;
+}
 
 /// The account service (Supabase Auth): signs in and out and hands out the
 /// access token the API checks. Tests replace it with a fake.
@@ -36,6 +56,18 @@ abstract interface class AuthGateway {
 
   /// Forgets the session on this device.
   Future<void> signOut();
+
+  /// Emails a reset link that opens the app ([Env.authRedirectUrl]).
+  Future<void> sendPasswordReset(String email);
+
+  /// Sets the password of the session a reset link opened.
+  Future<void> setNewPassword(String password);
+
+  /// Sends the confirmation email again.
+  Future<void> resendConfirmation(String email);
+
+  /// Auth links opened in the app (reset, confirmation).
+  Stream<AuthLinkEvent> get linkEvents;
 }
 
 class SupabaseAuthGateway implements AuthGateway {
@@ -75,7 +107,16 @@ class SupabaseAuthGateway implements AuthGateway {
 
   @override
   Future<void> signIn({required String email, required String password}) =>
-      _guard(() => _auth.signInWithPassword(email: email, password: password));
+      _guard(() async {
+        try {
+          await _auth.signInWithPassword(email: email, password: password);
+        } on AuthApiException catch (error) {
+          if (error.code == 'email_not_confirmed') {
+            throw EmailNotConfirmedException(email);
+          }
+          rethrow;
+        }
+      });
 
   @override
   Future<void> signUp({
@@ -87,12 +128,10 @@ class SupabaseAuthGateway implements AuthGateway {
       email: email,
       password: password,
       data: {'name': name},
+      emailRedirectTo: Env.authRedirectUrl,
     );
-    if (response.session == null) {
-      throw const ApiException(
-        'Te enviamos un correo para confirmar la cuenta. Confírmala e inicia sesión.',
-      );
-    }
+    // Email confirmation on: the account waits for the link.
+    if (response.session == null) throw EmailNotConfirmedException(email);
   });
 
   @override
@@ -129,6 +168,36 @@ class SupabaseAuthGateway implements AuthGateway {
     }
   }
 
+  @override
+  Future<void> sendPasswordReset(String email) => _guard(
+    () => _auth.resetPasswordForEmail(email, redirectTo: Env.authRedirectUrl),
+  );
+
+  @override
+  Future<void> setNewPassword(String password) =>
+      _guard(() => _auth.updateUser(UserAttributes(password: password)));
+
+  @override
+  Future<void> resendConfirmation(String email) => _guard(
+    () => _auth.resend(
+      type: OtpType.signup,
+      email: email,
+      emailRedirectTo: Env.authRedirectUrl,
+    ),
+  );
+
+  @override
+  Stream<AuthLinkEvent> get linkEvents => _auth.onAuthStateChange
+      .map(
+        (state) => switch (state.event) {
+          AuthChangeEvent.passwordRecovery => AuthLinkEvent.passwordRecovery,
+          AuthChangeEvent.signedIn => AuthLinkEvent.signedIn,
+          _ => null,
+        },
+      )
+      .where((event) => event != null)
+      .cast<AuthLinkEvent>();
+
   Future<void> _guard(Future<void> Function() action) async {
     try {
       await action();
@@ -149,6 +218,9 @@ ApiException authError(AuthException error) {
     'over_request_rate_limit' ||
     'over_email_send_rate_limit' => 'Demasiados intentos, espera un momento',
     'email_not_confirmed' => 'Confirma tu correo antes de iniciar sesión',
+    'same_password' => 'La nueva contraseña debe ser distinta de la actual',
+    'otp_expired' ||
+    'flow_state_expired' => 'El enlace expiró. Pide uno nuevo.',
     _ when error is AuthRetryableFetchException =>
       'No se pudo conectar con el servicio de cuentas.',
     _ => error.message,

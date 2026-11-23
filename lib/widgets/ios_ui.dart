@@ -1,3 +1,4 @@
+import 'money_privacy.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
@@ -5,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/theme/app_palette.dart';
+import '../core/theme/app_theme.dart';
 import '../core/theme/motion.dart';
 import '../core/utils/formatters.dart';
 
@@ -192,7 +194,6 @@ class _CollapsingTitleState extends State<CollapsingTitle> {
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
     final background = Theme.of(context).scaffoldBackgroundColor;
     return NotificationListener<ScrollNotification>(
       onNotification: _onScroll,
@@ -209,45 +210,72 @@ class _CollapsingTitleState extends State<CollapsingTitle> {
                 opacity: _collapsed ? 1 : 0,
                 duration: Motion.of(context, Motion.fast),
                 curve: Motion.standard,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    // Opaque enough to read over the content, no blur
-                    // (cheap to paint).
-                    color: background.withValues(alpha: .96),
-                    border: Border(bottom: BorderSide(color: palette.hairline)),
-                  ),
-                  child: SizedBox(
-                    height: 48,
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 56,
-                          child: widget.onBack == null || !_collapsed
-                              ? null
-                              : IconButton(
-                                  tooltip: 'Atrás',
-                                  onPressed: widget.onBack,
-                                  icon: const Icon(CupertinoIcons.chevron_left),
-                                ),
+                // iOS 26's scroll edge: no hard line, the page fades out
+                // under the title (a gradient: cheap, unlike a blur).
+                // Only the back button takes taps: the fade lets them through
+                // to the page.
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              stops: const [0, .6, 1],
+                              colors: [
+                                background,
+                                background,
+                                background.withValues(alpha: 0),
+                              ],
+                            ),
+                          ),
                         ),
-                        // Only while shown: hidden, it would repeat the
-                        // large title for screen readers (and finders).
-                        Expanded(
-                          child: !_collapsed
-                              ? const SizedBox.shrink()
-                              : Text(
-                                  widget.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(context).textTheme.titleMedium
-                                      ?.copyWith(fontWeight: FontWeight.w700),
-                                ),
-                        ),
-                        const SizedBox(width: 56),
-                      ],
+                      ),
                     ),
-                  ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 22),
+                      child: SizedBox(
+                        height: 48,
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 56,
+                              child: widget.onBack == null || !_collapsed
+                                  ? null
+                                  : IconButton(
+                                      tooltip: 'Atrás',
+                                      onPressed: widget.onBack,
+                                      icon: const Icon(
+                                        CupertinoIcons.chevron_left,
+                                      ),
+                                    ),
+                            ),
+                            // Only while shown: hidden, it would repeat the
+                            // large title for screen readers (and finders).
+                            Expanded(
+                              child: !_collapsed
+                                  ? const SizedBox.shrink()
+                                  : Text(
+                                      widget.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                            ),
+                            const SizedBox(width: 56),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -258,7 +286,8 @@ class _CollapsingTitleState extends State<CollapsingTitle> {
   }
 }
 
-/// iOS large title with optional subtitle and trailing actions.
+/// iOS large title (34, bold, tight) with optional subtitle and trailing
+/// actions.
 class LargeTitle extends StatelessWidget {
   const LargeTitle({
     super.key,
@@ -282,14 +311,15 @@ class LargeTitle extends StatelessWidget {
               Text(
                 title,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  letterSpacing: -1,
+                  fontSize: 34,
+                  letterSpacing: -1.1,
                   height: 1.15,
                 ),
               ),
               if (subtitle != null)
                 Text(
                   subtitle!,
-                  style: TextStyle(color: context.palette.muted, fontSize: 14),
+                  style: TextStyle(color: context.palette.muted, fontSize: 15),
                 ),
             ],
           ),
@@ -300,7 +330,82 @@ class LargeTitle extends StatelessWidget {
   }
 }
 
-/// Rounded-square outlined icon button for headers.
+/// Shrinks [child] slightly while a finger is on it, so a tap feels heard
+/// before anything else happens. Doesn't take part in gestures: the child
+/// still handles the tap. Release is as quick as the press.
+class PressScale extends StatefulWidget {
+  const PressScale({super.key, required this.child, this.scale = .96});
+
+  final Widget child;
+
+  /// .95–.98 for most things; small round buttons can go a little lower.
+  final double scale;
+
+  @override
+  State<PressScale> createState() => _PressScaleState();
+}
+
+class _PressScaleState extends State<PressScale> {
+  var _pressed = false;
+
+  void _set(bool pressed) {
+    if (pressed != _pressed) setState(() => _pressed = pressed);
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    onPointerDown: (_) => _set(true),
+    onPointerUp: (_) => _set(false),
+    onPointerCancel: (_) => _set(false),
+    child: AnimatedScale(
+      scale: _pressed ? widget.scale : 1,
+      duration: Motion.of(context, Motion.fast),
+      curve: Motion.standard,
+      child: widget.child,
+    ),
+  );
+}
+
+/// A person's initials on a gray gradient circle, like iOS Contacts.
+class InitialsAvatar extends StatelessWidget {
+  const InitialsAvatar({super.key, required this.initials, this.size = 44});
+
+  final String initials;
+  final double size;
+
+  static const _gradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0xFFA5A9B4), Color(0xFF848993)],
+  );
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    alignment: Alignment.center,
+    decoration: const BoxDecoration(
+      shape: BoxShape.circle,
+      gradient: _gradient,
+    ),
+    child: FittedBox(
+      child: Padding(
+        padding: EdgeInsets.all(size * .14),
+        child: Text(
+          initials.isEmpty ? 'U' : initials,
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: size * .4,
+            letterSpacing: .2,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// Round icon button for headers, like iOS toolbar buttons.
 class CircleButton extends StatelessWidget {
   const CircleButton({
     super.key,
@@ -312,7 +417,9 @@ class CircleButton extends StatelessWidget {
 
   final IconData icon;
   final String tooltip;
-  final VoidCallback onPressed;
+
+  /// Null disables it.
+  final VoidCallback? onPressed;
 
   /// Filled with the pill color (primary action) instead of outlined.
   final bool filled;
@@ -320,18 +427,23 @@ class CircleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    return PressScale(scale: .92, child: _button(context, palette));
+  }
+
+  Widget _button(BuildContext context, AppPalette palette) {
     return IconButton(
       tooltip: tooltip,
       onPressed: onPressed,
       icon: Icon(icon, size: 22),
       style: IconButton.styleFrom(
         fixedSize: const Size.square(44),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: const CircleBorder(),
+        // A plain card-colored circle: no outline, like iOS's toolbar
+        // buttons.
         backgroundColor: filled ? palette.pill : palette.card,
         foregroundColor: filled
             ? palette.onPill
             : Theme.of(context).colorScheme.onSurface,
-        side: filled ? null : BorderSide(color: palette.hairline),
       ),
     );
   }
@@ -368,8 +480,8 @@ class _BentoCardState extends State<BentoCard> {
 
   @override
   Widget build(BuildContext context) {
-    final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(widget.radius),
+    final shape = AppTheme.continuous(
+      widget.radius,
       side: widget.border
           ? BorderSide(color: context.palette.hairline)
           : BorderSide.none,
@@ -404,8 +516,6 @@ class _BentoCardState extends State<BentoCard> {
   }
 }
 
-/// Fades and slides its child up once, when it first appears. Use [index]
-/// to stagger the items of a page.
 /// Money that counts up to its value when it appears and glides to the new
 /// one when it changes (after saving a movement, a payment…). Tabular
 /// figures keep the width steady while the digits roll.
@@ -423,27 +533,38 @@ class AnimatedAmount extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    String visible(double value) =>
+        MoneyPrivacyScope.hiddenOf(context) ? '••••••' : format(value);
     final style = (this.style ?? const TextStyle()).copyWith(
       fontFeatures: const [FontFeature.tabularFigures()],
     );
     return Semantics(
-      label: format(value),
+      label: visible(value),
       excludeSemantics: true,
       child: TweenAnimationBuilder<double>(
         tween: Tween(begin: 0, end: value),
         duration: Motion.of(context, Motion.emphasis),
         curve: Motion.standard,
-        builder: (context, shown, _) => Text(format(shown), style: style),
+        builder: (context, shown, _) => Text(visible(shown), style: style),
       ),
     );
   }
 }
 
+/// Fades and slides its child up once, when it first appears. Use [index]
+/// to stagger the items of a page.
 class FadeSlideIn extends StatefulWidget {
   const FadeSlideIn({super.key, required this.child, this.index = 0});
 
   final Widget child;
   final int index;
+
+  /// Items whose entrance already played, per page: switching back to a tab
+  /// shows it as it was, as on iOS, instead of replaying the entrance.
+  static final _played = <Object>{};
+
+  @visibleForTesting
+  static void resetPlayed() => _played.clear();
 
   @override
   State<FadeSlideIn> createState() => _FadeSlideInState();
@@ -451,6 +572,9 @@ class FadeSlideIn extends StatefulWidget {
 
 class _FadeSlideInState extends State<FadeSlideIn>
     with SingleTickerProviderStateMixin {
+  /// The same rise for every item, whatever its height.
+  static const _rise = 14.0;
+
   // Items past Motion.maxStaggered arrive with the last staggered one, so a
   // long page still settles quickly.
   late final _delay =
@@ -467,10 +591,6 @@ class _FadeSlideInState extends State<FadeSlideIn>
       curve: Motion.standard,
     ),
   );
-  late final _offset = Tween(
-    begin: const Offset(0, .06),
-    end: Offset.zero,
-  ).animate(_curve);
   var _started = false;
 
   @override
@@ -478,7 +598,13 @@ class _FadeSlideInState extends State<FadeSlideIn>
     super.didChangeDependencies();
     if (_started) return;
     _started = true;
-    if (Motion.reduced(context)) {
+    // A tab's page keeps its key (its path) across visits; other routes
+    // get a new one each time they open.
+    final page = ModalRoute.of(context)?.settings;
+    final pageKey = page is Page ? page.key : null;
+    final played =
+        pageKey != null && !FadeSlideIn._played.add((pageKey, widget.index));
+    if (Motion.reduced(context) || played) {
       _controller.value = 1;
     } else {
       _controller.forward();
@@ -496,7 +622,14 @@ class _FadeSlideInState extends State<FadeSlideIn>
     // Transitions repaint without rebuilding the child each frame.
     return FadeTransition(
       opacity: _curve,
-      child: SlideTransition(position: _offset, child: widget.child),
+      child: AnimatedBuilder(
+        animation: _curve,
+        builder: (context, child) => Transform.translate(
+          offset: Offset(0, _rise * (1 - _curve.value)),
+          child: child,
+        ),
+        child: widget.child,
+      ),
     );
   }
 }
@@ -585,9 +718,9 @@ class FormError extends StatelessWidget {
               width: double.infinity,
               margin: const EdgeInsets.only(top: 12),
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
+              decoration: ShapeDecoration(
                 color: palette.blush,
-                borderRadius: BorderRadius.circular(14),
+                shape: AppTheme.continuous(14),
               ),
               child: Semantics(
                 liveRegion: true,
@@ -714,24 +847,26 @@ class InsetGroup extends StatelessWidget {
       children: [
         if (header != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 7),
+            // iOS grouped-list header: uppercase footnote.
             child: Text(
               header!.toUpperCase(),
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: context.palette.muted,
-                letterSpacing: .4,
+                letterSpacing: .2,
               ),
             ),
           ),
         BentoCard(
           padding: EdgeInsets.zero,
-          radius: 18,
+          radius: 20,
           child: Column(
             children: [
               for (var i = 0; i < children.length; i++) ...[
                 children[i],
+                // Starts where the row's text does, as in iOS.
                 if (i < children.length - 1)
-                  const Divider(indent: 56, height: 1),
+                  const Divider(indent: 60, height: 1),
               ],
             ],
           ),
@@ -747,6 +882,7 @@ class InsetTile extends StatelessWidget {
     super.key,
     required this.icon,
     required this.title,
+    this.subtitle,
     this.iconColor,
     this.trailing,
     this.onTap,
@@ -755,6 +891,7 @@ class InsetTile extends StatelessWidget {
 
   final IconData icon;
   final String title;
+  final String? subtitle;
   final Color? iconColor;
   final Widget? trailing;
   final VoidCallback? onTap;
@@ -764,35 +901,61 @@ class InsetTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final color = destructive ? scheme.error : (iconColor ?? scheme.primary);
-    return ListTile(
+    final trailing =
+        this.trailing ??
+        (onTap != null && !destructive
+            ? Icon(
+                CupertinoIcons.chevron_right,
+                size: 16,
+                color: context.palette.muted,
+              )
+            : null);
+    Widget tile(double maxWidth) => ListTile(
       onTap: onTap,
       minTileHeight: 52,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14),
       leading: Container(
         width: 30,
         height: 30,
-        decoration: BoxDecoration(
+        decoration: ShapeDecoration(
           color: color.withValues(alpha: .14),
-          borderRadius: BorderRadius.circular(8),
+          shape: AppTheme.continuous(8),
         ),
         child: Icon(icon, size: 18, color: color),
       ),
       title: Text(
         title,
         style: TextStyle(
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w400,
           color: destructive ? scheme.error : null,
         ),
       ),
-      trailing:
-          trailing ??
-          (onTap != null && !destructive
-              ? Icon(
-                  CupertinoIcons.chevron_right,
-                  size: 16,
-                  color: context.palette.muted,
-                )
-              : null),
+      subtitle: subtitle == null
+          ? null
+          : Text(
+              subtitle!,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: context.palette.muted),
+            ),
+      // At text size it could take the whole row with large text: the
+      // title keeps at least half.
+      trailing: trailing == null
+          ? null
+          : ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth * .4),
+              child: trailing,
+            ),
+    );
+    // A trailing value ("USD", "2 activos") reads at text size in the
+    // secondary color, as in iOS Settings (Material makes it a tiny label).
+    return ListTileTheme.merge(
+      leadingAndTrailingTextStyle: Theme.of(
+        context,
+      ).textTheme.bodyMedium?.copyWith(color: context.palette.muted),
+      child: LayoutBuilder(
+        builder: (context, constraints) => tile(constraints.maxWidth),
+      ),
     );
   }
 }
@@ -865,7 +1028,7 @@ class PillCta extends StatelessWidget {
   }
 }
 
-/// iOS segmented control: grey track with a white sliding thumb.
+/// iOS segmented control: grey capsule track with a white sliding thumb.
 class SegmentedTabs<T> extends StatelessWidget {
   const SegmentedTabs({
     super.key,
@@ -886,9 +1049,9 @@ class SegmentedTabs<T> extends StatelessWidget {
     final index = values.indexOf(selected);
     return Container(
       padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
+      decoration: ShapeDecoration(
+        color: palette.fill,
+        shape: const StadiumBorder(),
       ),
       child: Stack(
         children: [
@@ -911,14 +1074,14 @@ class SegmentedTabs<T> extends StatelessWidget {
                     duration: Motion.of(context, Motion.medium),
                     curve: Motion.standard,
                     child: DecoratedBox(
-                      decoration: BoxDecoration(
+                      decoration: ShapeDecoration(
                         color: palette.thumb,
-                        borderRadius: BorderRadius.circular(11),
-                        boxShadow: [
+                        shape: const StadiumBorder(),
+                        shadows: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: .08),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
+                            color: Colors.black.withValues(alpha: .06),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
                           ),
                         ],
                       ),
@@ -951,9 +1114,9 @@ class SegmentedTabs<T> extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 14,
-                                color: value == selected
-                                    ? onSurface
-                                    : palette.muted,
+                                // iOS keeps every label in the label color;
+                                // the thumb and weight mark the selection.
+                                color: onSurface,
                                 fontWeight: value == selected
                                     ? FontWeight.w600
                                     : FontWeight.w500,
@@ -1011,7 +1174,7 @@ Future<bool> confirmAction(
       title: Text(title),
       content: Padding(
         padding: const EdgeInsets.only(top: 4),
-        child: Text(message),
+        child: Text(context.privateMoneyText(message)),
       ),
       actions: [
         CupertinoDialogAction(

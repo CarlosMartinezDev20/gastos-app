@@ -236,6 +236,22 @@ def wordmark(ink, mark_color, size=160, tracking=-0.03, text="miaunero", face=No
     return svg(width, h, body)
 
 
+# Alternate launcher icons, one per accent of the app (lib/core/theme/app_accent.dart):
+# (light stop, accent, dark stop) of the mark's gradient. Lima is the default icon.
+ACCENT_ICONS = {
+    "Menta": ("#91F5C9", "#5BE3AE", "#35C592"),
+    "Cielo": ("#ACD9FF", "#7CC4FF", "#60A7E1"),
+    "Violeta": ("#CCC1FE", "#B7A4FF", "#9B88E0"),
+    "Ambar": ("#FEE2AB", "#FFC53D", "#E0A80A"),
+}
+
+
+def tinted(svg_text, colors):
+    """The same artwork with the lime gradient, glow and halo in another accent."""
+    hi, mid, lo = colors
+    return svg_text.replace("#DEFB7E", hi).replace(LIME, mid).replace("#A9D12C", lo)
+
+
 FILES = {
     "miaunero-app-icon.svg": app_icon(rounded=False),
     "miaunero-app-icon-rounded.svg": app_icon(rounded=True),
@@ -258,10 +274,15 @@ FILES = {
     "miaunero-wordmark-black.svg": wordmark(BLACK, BLACK),
     "miaunero-wordmark-white.svg": wordmark(WHITE, WHITE),
 }
+for _name, _colors in ACCENT_ICONS.items():
+    _key = _name.lower()
+    FILES[f"accent-icons/{_key}-app-icon.svg"] = tinted(app_icon(rounded=False), _colors)
+    FILES[f"accent-icons/{_key}-app-icon-rounded.svg"] = tinted(app_icon(rounded=True), _colors)
+    FILES[f"accent-icons/{_key}-android-foreground.svg"] = tinted(adaptive_foreground(), _colors)
 
 if __name__ == "__main__":
-    os.makedirs(OUT, exist_ok=True)
     for name, content in FILES.items():
+        os.makedirs(os.path.dirname(os.path.join(OUT, name)), exist_ok=True)
         with open(os.path.join(OUT, name), "w") as fh:
             fh.write(content)
     print(f"{len(FILES)} files in {OUT}")

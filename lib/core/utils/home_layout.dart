@@ -146,12 +146,9 @@ class HomeWidgetConfig {
   int get hashCode => Object.hash(type, size, style);
 }
 
+/// Plain cards by default, like iOS widgets: color is something people
+/// choose for one widget (long press), not the whole board shouting.
 HomeWidgetStyle defaultStyle(HomeWidgetType type) => switch (type) {
-  HomeWidgetType.income => HomeWidgetStyle.accent,
-  HomeWidgetType.spending => HomeWidgetStyle.ink,
-  HomeWidgetType.week => HomeWidgetStyle.lilac,
-  HomeWidgetType.budgets => HomeWidgetStyle.blush,
-  HomeWidgetType.goals => HomeWidgetStyle.mint,
   HomeWidgetType.quickAdd => HomeWidgetStyle.ink,
   _ => HomeWidgetStyle.card,
 };

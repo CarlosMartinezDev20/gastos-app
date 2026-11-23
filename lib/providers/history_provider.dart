@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/transaction.dart';
+import '../models/category.dart';
+import '../core/utils/transaction_filter.dart';
 import '../models/transaction_page.dart';
 import 'auth_provider.dart';
 import 'finance_providers.dart';
@@ -46,6 +48,37 @@ class HistoryNotifier extends AsyncNotifier<HistoryState> {
     // A refresh (e.g. after editing a movement deep in the list) reloads as
     // many as were on screen, so the list doesn't jump back to the top.
     final loaded = state.value?.items.length ?? 0;
+    final repository = ref.watch(financeRepositoryProvider);
+    if (query.paymentMethodId != null) {
+      // The deployed API supports category filtering but not payment methods.
+      // Fetch the complete matching history so totals never cover just one page.
+      final params = query.apiParams;
+      final all = await repository.transactions(
+        type: query.type,
+        from: params['from'] == null ? null : DateTime.parse(params['from']!),
+        to: params['to'] == null ? null : DateTime.parse(params['to']!),
+      );
+      final items = filterTransactions(
+        all,
+        query: query.search,
+        type: query.type,
+        categoryId: query.categoryId,
+        paymentMethodId: query.paymentMethodId,
+        from: query.from,
+        to: query.to,
+      );
+      double total(TransactionType type) => items
+          .where((t) => t.type == type)
+          .fold(0.0, (sum, t) => sum + t.amount);
+      return HistoryState(
+        items: items,
+        summary: HistorySummary(
+          count: items.length,
+          income: total(TransactionType.income),
+          expense: total(TransactionType.expense),
+        ),
+      );
+    }
     final page = await ref
         .watch(financeRepositoryProvider)
         .transactionPage(query, limit: loaded.clamp(pageSize, maxPage));

@@ -144,7 +144,7 @@ void main() {
         data(),
         content: PhoneWidgetContent.week,
         theme: PhoneWidgetTheme.dark,
-        balanceHidden: true,
+        balanceHidden: false,
         now: now,
       );
       expect(payload.amount, r'$30.00');

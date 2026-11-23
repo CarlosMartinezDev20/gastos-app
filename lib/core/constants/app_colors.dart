@@ -4,8 +4,8 @@ class AppColors {
   const AppColors._();
 
   static const primary = Color(0xFF28683A);
-  static const background = Color(0xFFF6F6F7);
-  static const backgroundAlt = Color(0xFFF6F6F7);
+  static const background = Color(0xFFF2F2F7);
+  static const backgroundAlt = Color(0xFFF2F2F7);
   static const card = Color(0xFFFFFFFF);
   static const blush = Color(0xFFF5E9E7);
   static const blushDeep = Color(0xFFE7B8B3);

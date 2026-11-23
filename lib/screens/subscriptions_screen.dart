@@ -1,10 +1,10 @@
+import '../widgets/money_privacy.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/theme/app_palette.dart';
-import '../core/utils/formatters.dart';
 import '../core/utils/subscriptions.dart';
 import '../core/utils/wallet.dart';
 import '../models/recurring.dart';
@@ -41,7 +41,7 @@ class SubscriptionsScreen extends ConsumerWidget {
             child: CollapsingTitle(
               title: 'Suscripciones',
               onBack: () =>
-                  context.canPop() ? context.pop() : context.go('/profile'),
+                  context.canPop() ? context.pop() : context.go('/wallet'),
               child: RefreshIndicator(
                 onRefresh: () => ref.refresh(recurringProvider.future),
                 child: ListView(
@@ -60,14 +60,13 @@ class SubscriptionsScreen extends ConsumerWidget {
                           tooltip: 'Volver',
                           onPressed: () => context.canPop()
                               ? context.pop()
-                              : context.go('/profile'),
+                              : context.go('/wallet'),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
                     LargeTitle(
                       title: 'Suscripciones',
-                      subtitle: 'Lo que pagas sin pensarlo, cada mes',
                       trailing: [
                         CircleButton(
                           icon: CupertinoIcons.add,
@@ -159,7 +158,7 @@ class _TotalCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '${Formatters.compactMoney(monthly * 12)} al año · '
+            '${context.money(monthly * 12)} al año · '
             '$active ${active == 1 ? 'activa' : 'activas'}',
             style: TextStyle(color: palette.inkMuted),
           ),
@@ -258,7 +257,7 @@ class _SubscriptionList extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          Formatters.compactMoney(s.amount),
+                          context.money(s.amount),
                           style: const TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 16,

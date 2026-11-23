@@ -16,10 +16,10 @@ class PhoneWidgetPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = payload.theme;
-    final fg = Color(theme.foreground);
-    final muted = Color(theme.muted);
-    final highlight = Color(theme.highlight);
+    final colors = payload.colors;
+    final fg = Color(colors.foreground);
+    final muted = Color(colors.muted);
+    final highlight = Color(colors.highlight);
     return Semantics(
       label: 'Vista previa del widget: ${payload.title}, ${payload.amount}',
       excludeSemantics: true,
@@ -28,7 +28,7 @@ class PhoneWidgetPreview extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: side),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Color(theme.background),
+          color: Color(colors.background),
           borderRadius: BorderRadius.circular(26),
           boxShadow: [
             BoxShadow(

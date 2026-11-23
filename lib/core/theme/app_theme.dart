@@ -3,13 +3,31 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../constants/app_colors.dart';
+import 'app_accent.dart';
 import 'app_palette.dart';
 import 'motion.dart';
 
-/// iOS-inspired look: clean grouped background, large tight titles, pill
-/// buttons, Cupertino transitions and bouncing scroll (see [AppScrollBehavior]).
+/// iOS-inspired look: Apple's grouped background and text styles, large
+/// tight titles, capsule buttons, continuous (squircle) corners, Cupertino
+/// transitions and bouncing scroll (see [AppScrollBehavior]).
 class AppTheme {
   const AppTheme._();
+
+  /// Apple's continuous corners: a squircle instead of a circular arc, so a
+  /// card's edge flows into its corner. Use it for cards, sheets and
+  /// controls; [radius] reads like a BorderRadius.circular one.
+  static RoundedSuperellipseBorder continuous(
+    double radius, {
+    BorderSide side = BorderSide.none,
+  }) => RoundedSuperellipseBorder(
+    borderRadius: BorderRadius.circular(radius),
+    side: side,
+  );
+
+  /// Apple's grouped-list background (light: systemGroupedBackground; dark:
+  /// black, with the cards one step up).
+  static const lightBackground = Color(0xFFF2F2F7);
+  static const darkBackground = Color(0xFF000000);
 
   /// Downloads Inter at runtime (google_fonts) instead of using the bundled
   /// copy; off by default and in tests.
@@ -20,7 +38,7 @@ class AppTheme {
   static String? get bodyFont => useGoogleFonts ? null : 'Inter';
   static String? get titleFont => useGoogleFonts ? null : 'InterDisplay';
 
-  static ThemeData light() {
+  static ThemeData light({AppAccent accent = AppAccent.lima}) {
     final scheme =
         ColorScheme.fromSeed(
           seedColor: AppColors.primary,
@@ -29,15 +47,22 @@ class AppTheme {
           primary: AppColors.primary,
           secondary: AppColors.income,
           surface: Colors.white,
+          // iOS tertiarySystemFill over white: fields, segmented tracks.
           surfaceContainerHighest: const Color(0xFFEEEEF0),
           onSurface: AppColors.textPrimary,
           onSurfaceVariant: AppPalette.light.muted,
           outlineVariant: AppPalette.light.hairline,
+          // iOS's accessible red (systemRed reads 3.5:1 on white).
+          error: const Color(0xFFD70015),
         );
-    return _base(scheme, AppPalette.light, const Color(0xFFF6F6F7));
+    return _base(
+      scheme,
+      AppPalette.light.withAccent(accent, dark: false),
+      lightBackground,
+    );
   }
 
-  static ThemeData dark() {
+  static ThemeData dark({AppAccent accent = AppAccent.lima}) {
     final scheme =
         ColorScheme.fromSeed(
           seedColor: AppColors.primary,
@@ -50,8 +75,13 @@ class AppTheme {
           onSurface: const Color(0xFFF6F6F7),
           onSurfaceVariant: AppPalette.dark.muted,
           outlineVariant: AppPalette.dark.hairline,
+          error: const Color(0xFFFF6961),
         );
-    return _base(scheme, AppPalette.dark, const Color(0xFF151617));
+    return _base(
+      scheme,
+      AppPalette.dark.withAccent(accent, dark: true),
+      darkBackground,
+    );
   }
 
   static ThemeData _base(
@@ -64,19 +94,21 @@ class AppTheme {
         : ThemeData(
             brightness: scheme.brightness,
           ).textTheme.apply(fontFamily: bodyFont);
-    // Material's tracking is tuned for Roboto (up to +0.5); Inter, like SF
-    // Pro, reads best neutral to slightly tight as text grows.
-    TextStyle? tracked(TextStyle? style, double spacing) =>
-        style?.copyWith(letterSpacing: spacing);
+    // Sizes follow Apple's text styles (Body 17, Subheadline 15, Footnote
+    // 13, Caption 12/11, Headline 17 semibold, Title 3 20) instead of
+    // Material's 16/14/12. Material's tracking is tuned for Roboto (up to
+    // +0.5); Inter, like SF Pro, reads best slightly tight as text grows.
+    TextStyle? apple(TextStyle? style, double size, double spacing) =>
+        style?.copyWith(fontSize: size, letterSpacing: spacing);
     final textTheme = baseText
         .apply(bodyColor: scheme.onSurface, displayColor: scheme.onSurface)
         .copyWith(
-          bodyLarge: tracked(baseText.bodyLarge, -0.2),
-          bodyMedium: tracked(baseText.bodyMedium, -0.1),
-          bodySmall: tracked(baseText.bodySmall, 0),
-          labelLarge: tracked(baseText.labelLarge, -0.1),
-          labelMedium: tracked(baseText.labelMedium, 0),
-          labelSmall: tracked(baseText.labelSmall, 0),
+          bodyLarge: apple(baseText.bodyLarge, 17, -0.3),
+          bodyMedium: apple(baseText.bodyMedium, 15, -0.2),
+          bodySmall: apple(baseText.bodySmall, 13, -0.05),
+          labelLarge: apple(baseText.labelLarge, 15, -0.2),
+          labelMedium: apple(baseText.labelMedium, 12, 0),
+          labelSmall: apple(baseText.labelSmall, 11, 0.05),
           // Large, tight headings like iOS large titles.
           displaySmall: baseText.displaySmall?.copyWith(
             fontFamily: titleFont,
@@ -96,21 +128,30 @@ class AppTheme {
             letterSpacing: -0.6,
             color: scheme.onSurface,
           ),
+          // Title 3, bolder: section headings ("Actividad reciente").
           titleLarge: baseText.titleLarge?.copyWith(
-            fontSize: 19,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.4,
+            fontFamily: titleFont,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.45,
             color: scheme.onSurface,
           ),
+          // Headline.
           titleMedium: baseText.titleMedium?.copyWith(
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.3,
+            color: scheme.onSurface,
+          ),
+          titleSmall: baseText.titleSmall?.copyWith(
+            fontSize: 15,
             fontWeight: FontWeight.w600,
             letterSpacing: -0.2,
             color: scheme.onSurface,
           ),
         );
-    final pillShape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(14),
-    );
+    // Buttons are capsules, as in iOS 26.
+    const pillShape = StadiumBorder();
 
     return ThemeData(
       useMaterial3: true,
@@ -146,12 +187,12 @@ class AppTheme {
       cardTheme: CardThemeData(
         elevation: 0,
         color: palette.card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: continuous(22),
         margin: EdgeInsets.zero,
       ),
       dividerTheme: DividerThemeData(
-        color: palette.hairline,
-        thickness: 1,
+        color: palette.separator,
+        thickness: AppPalette.separatorWidth,
         space: 1,
       ),
       chipTheme: ChipThemeData(
@@ -176,7 +217,8 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(56),
+          // iOS large control height.
+          minimumSize: const Size.fromHeight(52),
           backgroundColor: palette.pill,
           foregroundColor: palette.onPill,
           textStyle: textTheme.titleMedium?.copyWith(
@@ -237,24 +279,26 @@ class AppTheme {
           shape: WidgetStatePropertyAll(pillShape),
         ),
       ),
+      // iOS sheet: wide continuous corners and the 36×5 grabber.
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: palette.card,
         surfaceTintColor: Colors.transparent,
         showDragHandle: true,
-        dragHandleColor: scheme.onSurface.withValues(alpha: .18),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        dragHandleColor: scheme.onSurface.withValues(alpha: .2),
+        dragHandleSize: const Size(36, 5),
+        shape: const RoundedSuperellipseBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
         ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: palette.card,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: continuous(26),
       ),
       popupMenuTheme: PopupMenuThemeData(
         color: palette.card,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: continuous(18),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
@@ -263,7 +307,7 @@ class AppTheme {
           color: palette.onPill,
           fontWeight: FontWeight.w600,
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: continuous(20),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: palette.accent,

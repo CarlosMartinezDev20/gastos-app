@@ -77,6 +77,15 @@ class _StaleFirstToken implements AuthGateway {
   }) => real.changePassword(email: email, current: current, next: next);
   @override
   Future<void> signOut() => real.signOut();
+  @override
+  Future<void> sendPasswordReset(String email) => real.sendPasswordReset(email);
+  @override
+  Future<void> setNewPassword(String password) => real.setNewPassword(password);
+  @override
+  Future<void> resendConfirmation(String email) =>
+      real.resendConfirmation(email);
+  @override
+  Stream<AuthLinkEvent> get linkEvents => real.linkEvents;
 }
 
 // ignore_for_file: invalid_use_of_visible_for_testing_member
@@ -101,7 +110,7 @@ void main() {
   (ApiClient, AuthRepository, FinanceRepository) appWith(AuthGateway g) {
     final api = ApiClient(g);
     final auth = AuthRepository(api, g);
-    return (api, auth, FinanceRepository(api, auth));
+    return (api, auth, FinanceRepository(api));
   }
 
   setUpAll(() {
@@ -273,6 +282,8 @@ void main() {
 
     final page = await finance.transactionPage((
       search: 'almuerzo',
+      categoryId: null,
+      paymentMethodId: null,
       type: null,
       from: null,
       to: null,

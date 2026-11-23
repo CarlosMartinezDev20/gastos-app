@@ -1,3 +1,4 @@
+import 'money_privacy.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:shimmer/shimmer.dart';
@@ -29,7 +30,10 @@ class AppErrorState extends StatelessWidget {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const Gap(8),
-            Text(message, textAlign: TextAlign.center),
+            Text(
+              context.privateMoneyText(context.privateMoneyText(message)),
+              textAlign: TextAlign.center,
+            ),
             const Gap(18),
             FilledButton.icon(
               onPressed: onRetry,

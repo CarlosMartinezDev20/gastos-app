@@ -6,6 +6,8 @@ void main() {
   test('sends local calendar days as UTC instants, both days included', () {
     final HistoryQuery query = (
       search: '  café ',
+      categoryId: null,
+      paymentMethodId: null,
       type: TransactionType.expense,
       from: DateTime(2026, 10, 1),
       to: DateTime(2026, 10, 8),

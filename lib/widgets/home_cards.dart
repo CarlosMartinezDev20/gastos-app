@@ -1,13 +1,16 @@
+import '../providers/money_privacy_provider.dart';
+import 'balance_detail_sheet.dart';
+import 'money_privacy.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../core/theme/app_palette.dart';
 import '../core/utils/finance_insights.dart';
-import '../core/utils/formatters.dart';
 import '../core/utils/home_layout.dart';
 import '../core/utils/mascot_insights.dart';
 import '../core/utils/subscriptions.dart';
@@ -19,8 +22,6 @@ import '../models/recurring.dart';
 import '../models/savings_goal.dart';
 import '../models/transaction.dart';
 import '../providers/finance_providers.dart';
-import '../providers/phone_widget_provider.dart';
-import '../providers/storage_provider.dart';
 import '../screens/new_goal_sheet.dart';
 import '../screens/new_transaction_sheet.dart';
 import 'animated_progress.dart';
@@ -119,17 +120,24 @@ class HomeCard extends StatelessWidget {
       HomeWidgetType.balance => BalanceCard(data: data, tone: tone),
       HomeWidgetType.income => _AmountCard(
         label: 'Ingresos',
+        type: TransactionType.income,
         icon: CupertinoIcons.arrow_down_left,
         amount: _month(data).income,
         tone: tone,
       ),
       HomeWidgetType.spending => _AmountCard(
         label: 'Gastos',
+        type: TransactionType.expense,
         icon: CupertinoIcons.arrow_up_right,
         amount: _month(data).spent,
         tone: tone,
       ),
-      HomeWidgetType.cashflow => _CashflowCard(month: _month(data), tone: tone),
+      HomeWidgetType.cashflow => _CashflowCard(
+        // The calendar month, so it doesn't repeat the 30-day cards.
+        month: monthToDate(data.transactions, DateTime.now()),
+        now: DateTime.now(),
+        tone: tone,
+      ),
       HomeWidgetType.week => _WeekCard(
         days: lastSevenDays(data.transactions, DateTime.now()),
         compact: compact,
@@ -253,32 +261,30 @@ class BalanceCard extends ConsumerStatefulWidget {
 }
 
 class _BalanceCardState extends ConsumerState<BalanceCard> {
-  static const _mascotSize = 84.0;
+  static const _mascotSize = 64.0;
 
   int _tip = 0;
-
-  /// Remembered across sessions, like a banking app's privacy toggle.
-  late bool _hidden =
-      ref.read(sharedPreferencesProvider).getBool(balanceHiddenKey) ?? false;
+  bool _tipExpanded = false;
 
   void _toggleHidden() {
-    setState(() => _hidden = !_hidden);
-    ref.read(sharedPreferencesProvider).setBool(balanceHiddenKey, _hidden);
-    ref.invalidate(phoneWidgetPayloadProvider);
+    ref.read(moneyPrivacyProvider.notifier).toggle();
   }
 
   @override
   Widget build(BuildContext context) {
+    final hidden = ref.watch(moneyPrivacyProvider);
     final tone = widget.tone;
     final data = widget.data;
     final animations =
         Mascot.animate && !MediaQuery.disableAnimationsOf(context);
+    final now = DateTime.now();
     final tip = homeTip(
-      month: recentSummary(data.transactions, DateTime.now()),
+      month: recentSummary(data.transactions, now),
       balance: data.balance.balance,
       hasActivity: data.transactions.isNotEmpty,
       goalCount: data.goals.length,
       budgets: ref.watch(budgetsProvider).value ?? const [],
+      goalAlerts: goalMessages(data.goals, data.transactions, now: now),
     );
     final message = tip.messages[_tip % tip.messages.length];
     final amountStyle = TextStyle(
@@ -299,9 +305,35 @@ class _BalanceCardState extends ConsumerState<BalanceCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Balance disponible',
-                      style: TextStyle(color: tone.muted, fontSize: 14),
+                    Tooltip(
+                      message: 'Cómo se calcula el balance',
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 44),
+                        child: InkWell(
+                          onTap: () => showBalanceDetail(context, data),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            child: Wrap(
+                              spacing: 6,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  'Balance disponible',
+                                  style: TextStyle(
+                                    color: tone.muted,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                Icon(
+                                  CupertinoIcons.info_circle,
+                                  size: 16,
+                                  color: tone.muted,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Row(
@@ -310,7 +342,7 @@ class _BalanceCardState extends ConsumerState<BalanceCard> {
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
                             alignment: Alignment.centerLeft,
-                            child: _hidden
+                            child: hidden
                                 ? Text('••••••', style: amountStyle)
                                 : AnimatedAmount(
                                     data.balance.balance,
@@ -318,17 +350,25 @@ class _BalanceCardState extends ConsumerState<BalanceCard> {
                                   ),
                           ),
                         ),
-                        IconButton(
-                          tooltip: _hidden
-                              ? 'Mostrar balance'
-                              : 'Ocultar balance',
-                          onPressed: _toggleHidden,
-                          color: tone.muted,
-                          icon: Icon(
-                            _hidden
-                                ? CupertinoIcons.eye
-                                : CupertinoIcons.eye_slash,
-                            size: 20,
+                        Semantics(
+                          label: hidden
+                              ? 'Mostrar importes'
+                              : 'Ocultar importes',
+                          button: true,
+                          onTap: _toggleHidden,
+                          excludeSemantics: true,
+                          child: IconButton(
+                            tooltip: hidden
+                                ? 'Mostrar importes'
+                                : 'Ocultar importes',
+                            onPressed: _toggleHidden,
+                            color: tone.muted,
+                            icon: Icon(
+                              hidden
+                                  ? CupertinoIcons.eye
+                                  : CupertinoIcons.eye_slash,
+                              size: 20,
+                            ),
                           ),
                         ),
                       ],
@@ -344,60 +384,98 @@ class _BalanceCardState extends ConsumerState<BalanceCard> {
             ],
           ),
           const SizedBox(height: 10),
-          LayoutBuilder(
-            builder: (context, constraints) => SpeechBubble(
-              color: tone.subtle,
-              // Point at Michi, above the right end of the bubble.
-              tailUpAt: 1 - (_mascotSize / 2) / constraints.maxWidth,
-              child: AnimatedSwitcher(
-                duration: animations ? Motion.medium : Duration.zero,
-                transitionBuilder: (child, animation) => FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween(
-                      begin: const Offset(0, .25),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: child,
-                  ),
-                ),
-                layoutBuilder: (current, previous) => Stack(
-                  alignment: Alignment.centerLeft,
-                  children: [...previous, ?current],
-                ),
-                child: Text.rich(
-                  key: ValueKey(message),
-                  TextSpan(
+          Semantics(
+            button: true,
+            expanded: _tipExpanded,
+            label: _tipExpanded ? 'Contraer consejo' : 'Ampliar consejo',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => setState(() => _tipExpanded = !_tipExpanded),
+              child: LayoutBuilder(
+                builder: (context, constraints) => SpeechBubble(
+                  color: tone.subtle,
+                  // Point at Michi, above the right end of the bubble.
+                  tailUpAt: 1 - (_mascotSize / 2) / constraints.maxWidth,
+                  child: Row(
                     children: [
-                      TextSpan(
-                        text: '$mascotName  ',
-                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      Expanded(
+                        child: AnimatedSwitcher(
+                          duration: animations ? Motion.medium : Duration.zero,
+                          transitionBuilder: (child, animation) =>
+                              FadeTransition(
+                                opacity: animation,
+                                child: SlideTransition(
+                                  position: Tween(
+                                    begin: const Offset(0, .25),
+                                    end: Offset.zero,
+                                  ).animate(animation),
+                                  child: child,
+                                ),
+                              ),
+                          layoutBuilder: (current, previous) => Stack(
+                            alignment: Alignment.centerLeft,
+                            children: [...previous, ?current],
+                          ),
+                          child: Text.rich(
+                            key: ValueKey((message, _tipExpanded)),
+                            maxLines: _tipExpanded ? null : 1,
+                            overflow: _tipExpanded
+                                ? TextOverflow.visible
+                                : TextOverflow.ellipsis,
+                            TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: '$mascotName  ',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: context.privateMoneyText(message),
+                                ),
+                              ],
+                            ),
+                            style: TextStyle(
+                              color: tone.foreground,
+                              fontSize: 13,
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
                       ),
-                      TextSpan(text: message),
+                      const SizedBox(width: 6),
+                      Icon(
+                        _tipExpanded
+                            ? CupertinoIcons.chevron_up
+                            : CupertinoIcons.chevron_down,
+                        size: 14,
+                        color: tone.muted,
+                      ),
                     ],
-                  ),
-                  style: TextStyle(
-                    color: tone.foreground,
-                    fontSize: 13,
-                    height: 1.35,
                   ),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
+          // A secondary, tinted button (iOS's gray "bordered" style): the
+          // dock's + is the primary action.
           FilledButton(
             style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(50),
+              minimumSize: const Size.fromHeight(44),
               shape: const StadiumBorder(),
-              backgroundColor: tone.action,
-              foregroundColor: tone.onAction,
+              backgroundColor: tone.subtle,
+              foregroundColor: tone.foreground,
+              textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             onPressed: () => showNewTransactionSheet(
               context,
               initialType: TransactionType.income,
             ),
-            child: const Text('Añadir dinero'),
+            child: const Text('Registrar ingreso'),
           ),
         ],
       ),
@@ -411,12 +489,14 @@ class _BalanceCardState extends ConsumerState<BalanceCard> {
 class _AmountCard extends StatelessWidget {
   const _AmountCard({
     required this.label,
+    required this.type,
     required this.icon,
     required this.amount,
     required this.tone,
   });
 
   final String label;
+  final TransactionType type;
   final IconData icon;
   final double amount;
   final HomeTone tone;
@@ -425,9 +505,24 @@ class _AmountCard extends StatelessWidget {
   Widget build(BuildContext context) => _ToneCard(
     tone: tone,
     padding: EdgeInsets.zero,
-    onTap: () => context.go('/transactions'),
+    onTap: () {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      // Same inclusive 30-calendar-day window as recentSummary.
+      final start = DateTime(now.year, now.month, now.day - 29);
+      context.go(
+        Uri(
+          path: '/transactions',
+          queryParameters: {
+            'type': type.name,
+            'from': start.toIso8601String(),
+            'to': today.toIso8601String(),
+          },
+        ).toString(),
+      );
+    },
     child: CustomPaint(
-      painter: _StripesPainter(tone.foreground.withValues(alpha: .07)),
+      painter: _StripesPainter(tone.foreground.withValues(alpha: .025)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -438,7 +533,7 @@ class _AmountCard extends StatelessWidget {
             _BigAmount(amount),
             Text(
               'Últimos 30 días',
-              style: TextStyle(color: tone.muted, fontSize: 12),
+              style: TextStyle(color: tone.muted, fontSize: 13),
             ),
           ],
         ),
@@ -473,15 +568,40 @@ class _StripesPainter extends CustomPainter {
 // ───────────────────────────── Cash flow
 
 class _CashflowCard extends StatelessWidget {
-  const _CashflowCard({required this.month, required this.tone});
+  const _CashflowCard({
+    required this.month,
+    required this.now,
+    required this.tone,
+  });
 
-  final PeriodSummary month;
+  final ({PeriodSummary current, PeriodSummary previous}) month;
+  final DateTime now;
   final HomeTone tone;
+
+  /// How spending compares with the previous month at the same day, or null
+  /// without spending then to compare with.
+  String? _comparison() {
+    final before = month.previous.spent;
+    if (before <= 0) return null;
+    final previousName = DateFormat(
+      'MMMM',
+      'es',
+    ).format(DateTime(now.year, now.month - 1));
+    final change = (month.current.spent - before) / before * 100;
+    if (change.abs() < 1) {
+      return 'Gastas lo mismo que a esta altura de $previousName';
+    }
+    return 'Gastas ${change.abs().round()}% ${change < 0 ? 'menos' : 'más'} '
+        'que a esta altura de $previousName';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final left = month.income - month.spent;
-    final total = month.income + month.spent;
+    final current = month.current;
+    final monthName = DateFormat('MMMM', 'es').format(now);
+    final comparison = _comparison();
+    final left = current.income - current.spent;
+    final total = current.income + current.spent;
     Widget figure(String label, double value, IconData icon) => Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -509,20 +629,26 @@ class _CashflowCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _CardTitle(
-            'Flujo del mes',
+          _CardTitle(
+            'Flujo de $monthName',
             CupertinoIcons.arrow_right_arrow_left,
           ),
           Text(
-            'Últimos 30 días',
+            now.day == 1
+                ? 'Hoy, 1 de $monthName'
+                : 'Del 1 al ${now.day} de $monthName',
             style: TextStyle(color: tone.muted, fontSize: 12),
           ),
           const SizedBox(height: 14),
           Row(
             children: [
-              figure('Ingresos', month.income, CupertinoIcons.arrow_down_left),
+              figure(
+                'Ingresos',
+                current.income,
+                CupertinoIcons.arrow_down_left,
+              ),
               const SizedBox(width: 12),
-              figure('Gastos', month.spent, CupertinoIcons.arrow_up_right),
+              figure('Gastos', current.spent, CupertinoIcons.arrow_up_right),
             ],
           ),
           const SizedBox(height: 12),
@@ -538,7 +664,7 @@ class _CashflowCard extends StatelessWidget {
                         Expanded(
                           flex: math.max(
                             1,
-                            (month.income / total * 100).round(),
+                            (current.income / total * 100).round(),
                           ),
                           child: ColoredBox(color: tone.foreground),
                         ),
@@ -546,7 +672,7 @@ class _CashflowCard extends StatelessWidget {
                         Expanded(
                           flex: math.max(
                             1,
-                            (month.spent / total * 100).round(),
+                            (current.spent / total * 100).round(),
                           ),
                           child: ColoredBox(
                             color: tone.foreground.withValues(alpha: .3),
@@ -559,10 +685,14 @@ class _CashflowCard extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             left >= 0
-                ? 'Te quedan ${Formatters.compactMoney(left)}'
-                : 'Gastaste ${Formatters.compactMoney(-left)} más de lo que entró',
+                ? 'Te quedan ${context.money(left)}'
+                : 'Gastaste ${context.money(-left)} más de lo que entró',
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
+          if (comparison != null) ...[
+            const SizedBox(height: 2),
+            Text(comparison, style: TextStyle(color: tone.muted, fontSize: 13)),
+          ],
         ],
       ),
     );
@@ -753,8 +883,8 @@ class _GoalRow extends StatelessWidget {
       trackColor: tone.subtle,
     );
     final amounts = Text(
-      '${Formatters.compactMoney(goal.savedAmount)} de '
-      '${Formatters.compactMoney(goal.targetAmount)}',
+      '${context.money(goal.savedAmount)} de '
+      '${context.money(goal.targetAmount)}',
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(color: tone.muted, fontSize: 12),
@@ -886,8 +1016,8 @@ class _BudgetRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final left = budget.exceeded
-        ? 'Te pasaste ${Formatters.compactMoney(-budget.remaining)}'
-        : 'Quedan ${Formatters.compactMoney(budget.remaining)}';
+        ? 'Te pasaste ${context.money(-budget.remaining)}'
+        : 'Quedan ${context.money(budget.remaining)}';
     final percent = '${(budget.progress * 100).round()}%';
     final name = Row(
       children: [
@@ -1006,41 +1136,44 @@ class _QuickAddCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget button(String label, IconData icon, TransactionType type) =>
-        Material(
-          color: tone.action,
-          shape: const StadiumBorder(),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () => showNewTransactionSheet(context, initialType: type),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 44),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(icon, size: 18, color: tone.onAction),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        label,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: tone.onAction,
-                          fontWeight: FontWeight.w700,
-                        ),
+    // Only income takes the action color (lime is income across the app);
+    // the expense button takes the card's subtle tint.
+    Widget button(String label, IconData icon, TransactionType type) {
+      final income = type == TransactionType.income;
+      final foreground = income ? tone.onAction : tone.foreground;
+      return Material(
+        color: income ? tone.action : tone.subtle,
+        shape: const StadiumBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => showNewTransactionSheet(context, initialType: type),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 18, color: foreground),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      label,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: foreground,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
-        );
+        ),
+      );
+    }
+
     final expense = button(
       'Gasto',
       CupertinoIcons.minus,
@@ -1125,7 +1258,7 @@ class _WalletHomeCard extends ConsumerWidget {
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: Text(
-                Formatters.compactMoney(credit.isEmpty ? spentThisMonth : owed),
+                context.money(credit.isEmpty ? spentThisMonth : owed),
                 style: amountStyle,
               ),
             ),
@@ -1156,9 +1289,9 @@ class _WalletRow extends StatelessWidget {
     final method = summary.method;
     final debt = summary.debt;
     final value = debt == null
-        ? '${Formatters.compactMoney(summary.spent)} este mes'
+        ? '${context.money(summary.spent)} este mes'
         : debt > 0
-        ? 'Debes ${Formatters.compactMoney(debt)}'
+        ? 'Debes ${context.money(debt)}'
         : 'Al día';
     return Row(
       children: [
@@ -1228,7 +1361,7 @@ class _SubscriptionsHomeCard extends ConsumerWidget {
             CupertinoIcons.play_rectangle,
             trailing: subs.isEmpty || compact
                 ? null
-                : '${Formatters.compactMoney(monthlySubscriptionCost(subs))}/mes',
+                : '${context.money(monthlySubscriptionCost(subs))}/mes',
           ),
           if (subs.isEmpty) ...[
             const SizedBox(height: 18),
@@ -1242,7 +1375,7 @@ class _SubscriptionsHomeCard extends ConsumerWidget {
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: Text(
-                Formatters.compactMoney(monthlySubscriptionCost(subs)),
+                context.money(monthlySubscriptionCost(subs)),
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w800,
@@ -1281,7 +1414,7 @@ class _SubscriptionsHomeCard extends ConsumerWidget {
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    Formatters.compactMoney(s.amount),
+                    context.money(s.amount),
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ],

@@ -1,3 +1,4 @@
+import '../widgets/money_privacy.dart';
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
@@ -21,12 +22,16 @@ import '../widgets/app_states.dart';
 import '../widgets/ios_ui.dart';
 import '../widgets/transaction_tile.dart';
 import 'new_transaction_sheet.dart';
+import '../widgets/history_filter_sheet.dart';
 
 /// Segment values; null means "all".
 enum _TypeFilter { all, expense, income }
 
 class TransactionsScreen extends ConsumerStatefulWidget {
-  const TransactionsScreen({super.key});
+  const TransactionsScreen({super.key, this.initialType, this.initialRange});
+
+  final TransactionType? initialType;
+  final DateTimeRange? initialRange;
   @override
   ConsumerState<TransactionsScreen> createState() => _TransactionsScreenState();
 }
@@ -35,6 +40,19 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   final _search = TextEditingController();
   _TypeFilter _type = _TypeFilter.all;
   DateTimeRange? _range;
+  String? _categoryId;
+  String? _paymentMethodId;
+
+  @override
+  void initState() {
+    super.initState();
+    _type = switch (widget.initialType) {
+      TransactionType.expense => _TypeFilter.expense,
+      TransactionType.income => _TypeFilter.income,
+      null => _TypeFilter.all,
+    };
+    _range = widget.initialRange;
+  }
 
   /// The search the list was asked for; it follows the field after a pause
   /// in typing, so each keystroke doesn't hit the API.
@@ -62,6 +80,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
 
   HistoryQuery get _query => (
     search: _searched,
+    categoryId: _categoryId,
+    paymentMethodId: _paymentMethodId,
     type: _transactionType,
     from: _range?.start,
     to: _range?.end,
@@ -80,7 +100,22 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     _searched = '';
     _type = _TypeFilter.all;
     _range = null;
+    _categoryId = null;
+    _paymentMethodId = null;
   });
+
+  Future<void> _pickDetails() async {
+    final selected = await showHistoryFilterSheet(
+      context,
+      categoryId: _categoryId,
+      paymentMethodId: _paymentMethodId,
+    );
+    if (!mounted || selected == null) return;
+    setState(() {
+      _categoryId = selected.categoryId;
+      _paymentMethodId = selected.paymentMethodId;
+    });
+  }
 
   Future<void> _pickDates() async {
     final selected = await showDateRangePicker(
@@ -110,6 +145,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
             .read(financeRepositoryProvider)
             .transactions(type: query.type),
         query: query.search,
+        categoryId: query.categoryId,
+        paymentMethodId: query.paymentMethodId,
         from: query.from,
         to: query.to,
       );
@@ -181,6 +218,16 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     final income = history.summary.income;
     final expenses = history.summary.expense;
     final count = history.summary.count;
+    final categories = ref.watch(categoriesProvider).value ?? const [];
+    final methods = ref.watch(paymentMethodsProvider).value ?? const [];
+    final categoryName = categories
+        .where((c) => c.id == _categoryId)
+        .firstOrNull
+        ?.name;
+    final methodName = methods
+        .where((m) => m.id == _paymentMethodId)
+        .firstOrNull
+        ?.shortLabel;
     // One inset group per day, like a grouped iOS list.
     final days = <({String heading, List<Transaction> items})>[];
     DateTime? previousDay;
@@ -195,7 +242,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     }
 
     return CollapsingTitle(
-      title: 'Movimientos',
+      title: 'Historial',
       child: RefreshIndicator(
         onRefresh: () => ref.refresh(historyProvider(query).future),
         child: NotificationListener<ScrollNotification>(
@@ -219,8 +266,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       LargeTitle(
-                        title: 'Movimientos',
-                        subtitle: 'Cada ingreso y cada gasto',
+                        title: 'Historial',
                         trailing: [
                           CircleButton(
                             icon: CupertinoIcons.repeat,
@@ -244,6 +290,20 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                           _onSearchChanged('');
                         },
                         backgroundColor: palette.card,
+                        // A capsule, like iOS 26's search field.
+                        borderRadius: BorderRadius.circular(999),
+                        prefixInsets: const EdgeInsetsDirectional.fromSTEB(
+                          14,
+                          0,
+                          0,
+                          2,
+                        ),
+                        suffixInsets: const EdgeInsetsDirectional.fromSTEB(
+                          0,
+                          0,
+                          10,
+                          2,
+                        ),
                         style: Theme.of(context).textTheme.bodyLarge,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -274,6 +334,44 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                           ),
                         ],
                       ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: _pickDetails,
+                          icon: const Icon(
+                            CupertinoIcons.slider_horizontal_3,
+                            size: 18,
+                          ),
+                          label: const Text('Categoría y tarjeta'),
+                        ),
+                      ),
+                      if (_categoryId != null || _paymentMethodId != null)
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (_categoryId != null)
+                              InputChip(
+                                label: Text(
+                                  categoryName ?? 'Categoría seleccionada',
+                                ),
+                                onDeleted: () =>
+                                    setState(() => _categoryId = null),
+                                deleteButtonTooltipMessage:
+                                    'Quitar filtro de categoría',
+                              ),
+                            if (_paymentMethodId != null)
+                              InputChip(
+                                label: Text(
+                                  methodName ?? 'Método seleccionado',
+                                ),
+                                onDeleted: () =>
+                                    setState(() => _paymentMethodId = null),
+                                deleteButtonTooltipMessage:
+                                    'Quitar filtro de tarjeta',
+                              ),
+                          ],
+                        ),
                       if (_range != null) ...[
                         const SizedBox(height: 10),
                         Align(
@@ -299,8 +397,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                             child: _SummaryTile(
                               label: 'Ingresos',
                               amount: income,
-                              color: palette.mint,
-                              onColor: palette.onMint,
+                              color: palette.card,
+                              onColor: palette.positive,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -308,8 +406,8 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                             child: _SummaryTile(
                               label: 'Gastos',
                               amount: expenses,
-                              color: palette.blush,
-                              onColor: palette.onBlush,
+                              color: palette.card,
+                              onColor: Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                         ],
@@ -319,7 +417,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              '$count ${count == 1 ? 'movimiento' : 'movimientos'} · balance ${Formatters.compactMoney(income - expenses)}',
+                              '$count ${count == 1 ? 'movimiento' : 'movimientos'} · balance ${context.money(income - expenses)}',
                               style: TextStyle(color: palette.muted),
                             ),
                           ),
@@ -481,7 +579,7 @@ class _SwipeToDelete extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tile = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: TransactionTile(transaction: transaction),
+      child: TransactionTile(transaction: transaction, showDate: false),
     );
     if (transaction.isGoalContribution) return tile;
     final error = Theme.of(context).colorScheme.error;
@@ -534,7 +632,10 @@ class _LoadError extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     children: [
       Expanded(
-        child: Text(message, style: TextStyle(color: context.palette.muted)),
+        child: Text(
+          context.privateMoneyText(message),
+          style: TextStyle(color: context.palette.muted),
+        ),
       ),
       TextButton(onPressed: onRetry, child: const Text('Reintentar')),
     ],

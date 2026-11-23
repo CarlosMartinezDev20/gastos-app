@@ -3,8 +3,10 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/constants/app_constants.dart';
+import '../core/auth/auth_gateway.dart';
 import '../core/theme/app_palette.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/ios_ui.dart';
@@ -596,6 +598,11 @@ class _AuthFormState extends ConsumerState<AuthForm> {
   bool _passwordVisible = false;
   String? _error;
 
+  /// The account waits for its confirmation link (email confirmation on).
+  String? _unconfirmedEmail;
+  bool _resending = false;
+  String? _resendNote;
+
   // Michi watches the fields: it follows what you type and covers its eyes
   // while you write the password. Only its header rebuilds on each key.
   final _nameFocus = FocusNode();
@@ -661,6 +668,8 @@ class _AuthFormState extends ConsumerState<AuthForm> {
     setState(() {
       _loading = true;
       _error = null;
+      _unconfirmedEmail = null;
+      _resendNote = null;
     });
     try {
       final auth = ref.read(authControllerProvider.notifier);
@@ -679,6 +688,14 @@ class _AuthFormState extends ConsumerState<AuthForm> {
           ModalRoute.of(context)?.isCurrent == true) {
         Navigator.pop(context);
       }
+    } on EmailNotConfirmedException catch (error) {
+      if (mounted) {
+        setState(() {
+          _unconfirmedEmail = error.email;
+          // A new account: back to "Iniciar sesión" for after the link.
+          _register = false;
+        });
+      }
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
@@ -686,10 +703,37 @@ class _AuthFormState extends ConsumerState<AuthForm> {
     }
   }
 
+  Future<void> _resendConfirmation() async {
+    final email = _unconfirmedEmail;
+    if (email == null || _resending) return;
+    setState(() {
+      _resending = true;
+      _resendNote = null;
+    });
+    try {
+      await ref.read(authRepositoryProvider).resendConfirmation(email);
+      if (mounted) {
+        setState(() => _resendNote = 'Listo, te lo enviamos otra vez.');
+      }
+    } catch (error) {
+      if (mounted) setState(() => _resendNote = error.toString());
+    } finally {
+      if (mounted) setState(() => _resending = false);
+    }
+  }
+
+  void _forgotPassword() {
+    final router = GoRouter.of(context);
+    final email = _email.text.trim();
+    if (widget.inSheet) Navigator.pop(context);
+    router.push('/forgot-password', extra: email.isEmpty ? null : email);
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final text = Theme.of(context).textTheme;
+    final unconfirmed = _unconfirmedEmail;
     return AutofillGroup(
       child: Form(
         key: _formKey,
@@ -828,6 +872,64 @@ class _AuthFormState extends ConsumerState<AuthForm> {
                   ? 'Mínimo 8 caracteres'
                   : null,
             ),
+            if (!_register)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _loading ? null : _forgotPassword,
+                  child: const Text('¿Olvidaste tu contraseña?'),
+                ),
+              ),
+            if (unconfirmed != null)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(top: 14),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: palette.mint,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Semantics(
+                  liveRegion: true,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Confirma tu correo',
+                        style: TextStyle(
+                          color: palette.onMint,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Te enviamos un enlace a $unconfirmed. Ábrelo en este '
+                        'teléfono y después inicia sesión.',
+                        style: TextStyle(color: palette.onMint),
+                      ),
+                      if (_resendNote case final note?) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          note,
+                          style: TextStyle(
+                            color: palette.onMint,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: _resending ? null : _resendConfirmation,
+                          child: Text(
+                            _resending ? 'Enviando…' : 'Reenviar correo',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             AnimatedSize(
               duration: Motion.of(context, Motion.medium),
               child: _error == null

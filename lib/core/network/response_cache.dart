@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,17 +7,57 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// The last successful answer of each GET, per user, so the app can show
 /// it when there is no connection. Cleared on logout.
 class ResponseCache {
-  ResponseCache(this._prefs);
+  ResponseCache(this._prefs, {this.maxEntries = 40});
 
   final SharedPreferences _prefs;
 
+  /// SharedPreferences is read whole at startup and rewritten on every
+  /// change, so only the most recently saved answers are kept.
+  final int maxEntries;
+
   static const _prefix = 'api_cache:';
+
+  /// The saved keys, oldest first.
+  static const _orderKey = 'api_cache_order';
 
   String _key(String user, RequestOptions options) =>
       '$_prefix$user:${options.uri.path}?${options.uri.query}';
 
-  Future<void> save(String user, RequestOptions options, Object? data) =>
-      _prefs.setString(_key(user, options), jsonEncode(data));
+  /// Searches and later pages of a list vary with every keystroke and
+  /// scroll; offline, the first page of each list is enough.
+  static bool worthSaving(RequestOptions options) {
+    final query = options.uri.queryParameters;
+    return !query.containsKey('cursor') && (query['q'] ?? '').isEmpty;
+  }
+
+  Future<void> save(String user, RequestOptions options, Object? data) async {
+    if (!worthSaving(options)) return;
+    final key = _key(user, options);
+    final body = jsonEncode(data);
+    final saved = _prefs.getStringList(_orderKey);
+    final order = [...saved ?? const <String>[]]
+      ..remove(key)
+      ..add(key);
+    final evicted = order.length > maxEntries
+        ? order.sublist(0, order.length - maxEntries)
+        : <String>[];
+    // No index yet: answers saved by older versions (every search and page)
+    // go away once.
+    if (saved == null) {
+      evicted.addAll(
+        _prefs.getKeys().where((k) => k.startsWith(_prefix) && k != key),
+      );
+    }
+    order.removeRange(0, order.length - math.min(order.length, maxEntries));
+    // Every write starts before the first await: SharedPreferences updates
+    // its memory at once, so answers arriving together can't lose a key.
+    await Future.wait([
+      _prefs.setStringList(_orderKey, order),
+      for (final old in evicted) _prefs.remove(old),
+      // The same answer as last time: no need to rewrite the file.
+      if (_prefs.getString(key) != body) _prefs.setString(key, body),
+    ]);
+  }
 
   /// The cached body, or null when this request was never answered.
   Object? read(String user, RequestOptions options) {
@@ -28,6 +69,7 @@ class ResponseCache {
     for (final key in _prefs.getKeys().where((k) => k.startsWith(_prefix))) {
       await _prefs.remove(key);
     }
+    await _prefs.remove(_orderKey);
   }
 }
 

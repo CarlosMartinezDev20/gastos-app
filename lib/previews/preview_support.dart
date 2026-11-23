@@ -125,7 +125,7 @@ final previewTransactions = [
   ),
 ];
 
-const previewGoals = [
+final previewGoals = [
   SavingsGoal(
     id: 'g1',
     name: 'Laptop',
@@ -135,6 +135,7 @@ const previewGoals = [
     bgColor: '',
     iconColor: '',
     progressPercent: 37.5,
+    targetDate: DateTime(DateTime.now().year + 1, 6, 30),
   ),
   SavingsGoal(
     id: 'g2',

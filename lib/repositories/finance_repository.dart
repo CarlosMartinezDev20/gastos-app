@@ -2,15 +2,12 @@ import '../core/network/api_client.dart';
 import '../core/network/api_endpoints.dart';
 import '../models/budget.dart';
 import '../models/category.dart';
-import '../models/dashboard.dart';
 import '../models/metrics.dart';
 import '../models/recurring.dart';
 import '../models/savings_goal.dart';
 import '../models/transaction.dart';
 import '../models/transaction_page.dart';
-import '../models/user_profile.dart';
 import '../models/payment_method.dart';
-import 'auth_repository.dart';
 
 /// Where the movements the app keeps in memory start: this month and the
 /// twelve before it, enough for every chart, average and statement.
@@ -18,25 +15,9 @@ import 'auth_repository.dart';
 DateTime recentWindowStart(DateTime now) => DateTime(now.year - 1, now.month);
 
 class FinanceRepository {
-  const FinanceRepository(this._api, this._auth);
+  const FinanceRepository(this._api);
 
   final ApiClient _api;
-  final AuthRepository _auth;
-
-  Future<DashboardData> dashboard() async {
-    final results = await Future.wait<dynamic>([
-      _auth.profile(),
-      balance(),
-      savingsGoals(),
-      transactions(from: recentWindowStart(DateTime.now())),
-    ]);
-    return DashboardData(
-      user: results[0] as UserProfile,
-      balance: results[1] as BalanceSummary,
-      goals: results[2] as List<SavingsGoal>,
-      transactions: results[3] as List<Transaction>,
-    );
-  }
 
   Future<List<Category>> categories() async {
     try {
@@ -426,6 +407,7 @@ class FinanceRepository {
     required String icon,
     required String bgColor,
     required String iconColor,
+    DateTime? targetDate,
   }) async {
     try {
       final response = await _api.dio.post(
@@ -436,6 +418,7 @@ class FinanceRepository {
           'icon': icon,
           'bgColor': bgColor,
           'iconColor': iconColor,
+          if (targetDate != null) 'targetDate': apiDay(targetDate),
         },
       );
       return SavingsGoal.fromJson(response.data as Map<String, dynamic>);
@@ -449,11 +432,18 @@ class FinanceRepository {
     required String name,
     required double targetAmount,
     required String icon,
+    required DateTime? targetDate,
   }) async {
     try {
       final response = await _api.dio.patch(
         ApiEndpoints.savingsGoal(id),
-        data: {'name': name, 'targetAmount': targetAmount, 'icon': icon},
+        data: {
+          'name': name,
+          'targetAmount': targetAmount,
+          'icon': icon,
+          // null clears it.
+          'targetDate': targetDate == null ? null : apiDay(targetDate),
+        },
       );
       return SavingsGoal.fromJson(response.data as Map<String, dynamic>);
     } catch (error) {

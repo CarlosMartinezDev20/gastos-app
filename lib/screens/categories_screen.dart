@@ -37,7 +37,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
             child: CollapsingTitle(
               title: 'Categorías',
               onBack: () =>
-                  context.canPop() ? context.pop() : context.go('/profile'),
+                  context.canPop() ? context.pop() : context.go('/metrics'),
               child: RefreshIndicator(
                 onRefresh: () => ref.refresh(categoriesProvider.future),
                 child: ListView(
@@ -56,14 +56,13 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
                           tooltip: 'Volver',
                           onPressed: () => context.canPop()
                               ? context.pop()
-                              : context.go('/profile'),
+                              : context.go('/metrics'),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
                     LargeTitle(
                       title: 'Categorías',
-                      subtitle: 'Ordena tus gastos e ingresos a tu manera',
                       trailing: [
                         CircleButton(
                           icon: CupertinoIcons.add,

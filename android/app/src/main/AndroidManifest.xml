@@ -1,9 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The API (Render) and Supabase Auth. Without it in the main manifest,
+         release builds can't reach the network (debug adds it on its own). -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Scanning receipts and invoice QR codes (asked only when scanning). -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <!-- Payment reminders: reschedule them after a reboot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Unlocking the app with the fingerprint or face (Perfil switch). -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <application
         android:label="Miaunero"
         android:name="${applicationName}"
@@ -25,11 +30,77 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- The launcher entry is one of the activity-aliases below. -->
+            <!-- Supabase Auth links (password reset, email confirmation) come
+                 back to the app here; supabase_flutter reads them. Must match
+                 Env.authRedirectUrl and the redirect URLs in supabase/config.toml. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="io.github.carlosmartinezdev20.appgastos"
+                    android:host="auth-callback" />
+            </intent-filter>
+        </activity>
+        <!-- Launcher entries, one per accent (Perfil → Apariencia): only one is
+             enabled at a time; MainActivity's "miaunero/app_icon" channel switches
+             them. Icons from branding/accent_icons.sh. -->
+        <activity-alias
+            android:name=".LauncherLima"
+            android:targetActivity=".MainActivity"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-        </activity>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherMenta"
+            android:targetActivity=".MainActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_menta">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherCielo"
+            android:targetActivity=".MainActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_cielo">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherVioleta"
+            android:targetActivity=".MainActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_violeta">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherAmbar"
+            android:targetActivity=".MainActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_ambar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
         <!-- Payment reminders (flutter_local_notifications). -->
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">

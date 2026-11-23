@@ -4,6 +4,8 @@
 <dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Para escanear el código QR de tus facturas y leer el total de tus tickets.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Para desbloquear Miaunero con tu rostro.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Para leer el total de un ticket desde una foto que ya tomaste.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
@@ -20,6 +22,16 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>appgastos</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<!-- Supabase Auth links (password reset, email confirmation). -->
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>io.github.carlosmartinezdev20.appgastos</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

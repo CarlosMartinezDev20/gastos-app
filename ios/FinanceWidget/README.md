@@ -10,7 +10,7 @@ se crea en Xcode (no se puede generar sin macOS):
 3. Borra el `.swift` que Xcode generó dentro de `FinanceWidget/` y añade al
    target el `FinanceWidget.swift` de esta carpeta.
 4. En **Signing & Capabilities**, añade **App Groups** a *Runner* y a
-   *FinanceWidgetExtension* con el grupo `group.com.example.appgastos`
+   *FinanceWidgetExtension* con el grupo `group.io.github.carlosmartinezdev20.appgastos`
    (el mismo que `PhoneWidgetService.appGroupId`).
 5. Pon el *Deployment Target* de la extensión en iOS 14 o más.
 

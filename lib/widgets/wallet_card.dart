@@ -1,7 +1,7 @@
+import 'money_privacy.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import '../core/utils/formatters.dart';
 import '../core/utils/wallet.dart';
 import '../models/payment_method.dart';
 
@@ -70,8 +70,7 @@ class WalletCard extends StatelessWidget {
         method.name,
         method.kind.label,
         if (method.last4 != null) 'terminada en ${method.last4}',
-        if (summary != null)
-          'gastado ${Formatters.compactMoney(summary.spent)}',
+        if (summary != null) 'gastado ${context.money(summary.spent)}',
       ].join(', '),
       excludeSemantics: true,
       child: AspectRatio(
@@ -189,7 +188,7 @@ class WalletCard extends StatelessWidget {
                                       ),
                                     ),
                                     Text(
-                                      Formatters.compactMoney(summary.spent),
+                                      context.money(summary.spent),
                                       style: TextStyle(
                                         color: fg,
                                         fontSize: 18,

@@ -14,7 +14,9 @@ class ThemeToggle extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dark = ref.watch(isDarkModeProvider);
+    // What is on screen (the mode may be automatic): the button flips it to an
+    // explicit light or dark.
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return DayNightButton(
       value: dark,
       onChanged: (value) {
@@ -48,7 +50,7 @@ class DayNightButton extends StatelessWidget {
       onPressed: () => onChanged(!value),
       style: IconButton.styleFrom(
         fixedSize: const Size.square(44),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: const CircleBorder(),
         backgroundColor: palette.card,
         side: BorderSide(color: palette.hairline),
         foregroundColor: Theme.of(context).colorScheme.onSurface,

@@ -9,8 +9,9 @@ class PhoneWidgetService {
   const PhoneWidgetService();
 
   /// App Group shared by the app and the iOS widget extension.
-  static const appGroupId = 'group.com.example.appgastos';
-  static const androidProvider = 'com.example.appgastos.FinanceWidgetProvider';
+  static const appGroupId = 'group.io.github.carlosmartinezdev20.appgastos';
+  static const androidProvider =
+      'io.github.carlosmartinezdev20.appgastos.FinanceWidgetProvider';
   static const iOSKind = 'FinanceWidget';
 
   bool get supported =>

@@ -1,3 +1,4 @@
+import '../widgets/money_privacy.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -5,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/theme/app_palette.dart';
-import '../core/utils/formatters.dart';
 import '../core/utils/subscriptions.dart';
 import '../models/category.dart';
 import '../models/recurring.dart';
@@ -36,8 +36,9 @@ class RecurringScreen extends ConsumerWidget {
             constraints: const BoxConstraints(maxWidth: 760),
             child: CollapsingTitle(
               title: 'Recurrentes',
-              onBack: () =>
-                  context.canPop() ? context.pop() : context.go('/profile'),
+              onBack: () => context.canPop()
+                  ? context.pop()
+                  : context.go('/transactions'),
               child: RefreshIndicator(
                 onRefresh: () => ref.refresh(recurringProvider.future),
                 child: ListView(
@@ -56,14 +57,13 @@ class RecurringScreen extends ConsumerWidget {
                           tooltip: 'Volver',
                           onPressed: () => context.canPop()
                               ? context.pop()
-                              : context.go('/profile'),
+                              : context.go('/transactions'),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
                     LargeTitle(
                       title: 'Recurrentes',
-                      subtitle: 'Mesada, alquiler, suscripciones…',
                       trailing: [
                         CircleButton(
                           icon: CupertinoIcons.add,
@@ -284,7 +284,7 @@ class _RecurringRow extends ConsumerWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            '${income ? '+' : '−'}${Formatters.compactMoney(rule.amount)}',
+            '${income ? '+' : '−'}${context.money(rule.amount)}',
             style: TextStyle(
               fontWeight: FontWeight.w700,
               color: rule.active ? null : palette.muted,
@@ -422,6 +422,7 @@ class _RecurringSheetState extends ConsumerState<_RecurringSheet> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _amount,
+                obscureText: MoneyPrivacyScope.hiddenOf(context),
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
@@ -519,8 +520,8 @@ class _EmptyRecurring extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Al registrar un movimiento, elige "Cada semana" o '
-                      '"Cada mes" y yo lo anoto por ti.',
+                      'Al registrar un movimiento, abre "Repetir movimiento" '
+                      'y elige cada cuánto. Yo lo anoto por ti.',
                       style: TextStyle(color: palette.muted),
                     ),
                   ],

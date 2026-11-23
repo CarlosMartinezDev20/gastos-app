@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/theme/motion.dart';
+import '../models/category.dart';
 import '../providers/auth_provider.dart';
 import '../screens/categories_screen.dart';
 import '../screens/customize_home_screen.dart';
@@ -11,6 +12,7 @@ import '../screens/goals_screen.dart';
 import '../screens/recurring_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/login_screen.dart';
+import '../screens/password_reset_screens.dart';
 import '../screens/metrics_screen.dart';
 import '../screens/new_goal_full_screen.dart';
 import '../screens/profile_screen.dart';
@@ -23,8 +25,9 @@ import '../widgets/app_shell.dart';
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 /// Tabs and auth screens replace each other instead of stacking, so they
-/// fade (like native tab bars) rather than slide in like a pushed page.
-/// Pushed pages (e.g. /goals/new) keep the theme's Cupertino slide.
+/// only cross-fade, quickly, like iOS tab bars (no slide: the content
+/// doesn't come from anywhere). Pushed pages (e.g. /goals/new) keep the
+/// theme's Cupertino slide.
 Page<void> _fadePage(GoRouterState state, Widget child) =>
     CustomTransitionPage<void>(
       key: state.pageKey,
@@ -33,20 +36,13 @@ Page<void> _fadePage(GoRouterState state, Widget child) =>
       reverseTransitionDuration: Motion.fast,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         if (Motion.reduced(context)) return child;
-        final curved = CurvedAnimation(
-          parent: animation,
-          curve: Motion.standard,
-          reverseCurve: Motion.exit,
-        );
         return FadeTransition(
-          opacity: curved,
-          child: SlideTransition(
-            position: Tween(
-              begin: const Offset(0, .015),
-              end: Offset.zero,
-            ).animate(curved),
-            child: child,
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: Motion.standard,
+            reverseCurve: Motion.exit,
           ),
+          child: child,
         );
       },
     );
@@ -57,6 +53,11 @@ Page<void> _fadePage(GoRouterState state, Widget child) =>
 final routerProvider = Provider<GoRouter>((ref) {
   // null = session not resolved yet (token check on startup).
   final loggedIn = ValueNotifier<bool?>(null);
+  // A reset link opened the app: only the new-password page until it's set.
+  final recovering = ValueNotifier(false);
+  ref.listen(passwordRecoveryProvider, (_, next) {
+    recovering.value = next;
+  }, fireImmediately: true);
   ref.listen(authControllerProvider, (_, next) {
     // Keep the current route while a login/register request is running.
     if (next.isLoading) return;
@@ -66,13 +67,25 @@ final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/splash',
-    refreshListenable: loggedIn,
+    refreshListenable: Listenable.merge([loggedIn, recovering]),
     redirect: (context, state) {
       final status = loggedIn.value;
       final path = state.uri.path;
+      if (recovering.value) {
+        return path == '/reset-password' ? null : '/reset-password';
+      }
       if (status == null) return path == '/splash' ? null : '/splash';
-      if (!status) return path == '/login' ? null : '/login';
-      if (path == '/login' || path == '/splash') return '/home';
+      if (!status) {
+        return path == '/login' || path == '/forgot-password' ? null : '/login';
+      }
+      if (const {
+        '/login',
+        '/splash',
+        '/forgot-password',
+        '/reset-password',
+      }.contains(path)) {
+        return '/home';
+      }
       return null;
     },
     routes: [
@@ -84,7 +97,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/login',
         pageBuilder: (context, state) => _fadePage(state, const LoginScreen()),
       ),
-      // Full-screen, above the shell (opened from Perfil).
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) =>
+            ForgotPasswordScreen(initialEmail: state.extra as String?),
+      ),
+      GoRoute(
+        path: '/reset-password',
+        pageBuilder: (context, state) =>
+            _fadePage(state, const ResetPasswordScreen()),
+      ),
+      // Full-screen pages above the shell, opened from the tabs' headers.
       GoRoute(
         path: '/categories',
         builder: (context, state) => const CategoriesScreen(),
@@ -120,31 +143,47 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/transactions',
-            pageBuilder: (context, state) =>
-                _fadePage(state, const TransactionsScreen()),
+            pageBuilder: (context, state) => _fadePage(
+              state,
+              BackToHome(
+                child: TransactionsScreen(
+                  key: ValueKey(state.uri.toString()),
+                  initialType: switch (state.uri.queryParameters['type']) {
+                    'income' => TransactionType.income,
+                    'expense' => TransactionType.expense,
+                    _ => null,
+                  },
+                  initialRange: _historyRange(state.uri),
+                ),
+              ),
+            ),
           ),
           GoRoute(
             path: '/goals',
             pageBuilder: (context, state) =>
-                _fadePage(state, const GoalsScreen()),
+                _fadePage(state, const BackToHome(child: GoalsScreen())),
             routes: [
               // Full-screen form: shown above the shell, without bottom nav or FAB.
               GoRoute(
                 path: 'new',
                 parentNavigatorKey: _rootNavigatorKey,
-                builder: (context, state) => const NewGoalFullScreen(),
+                builder: (context, state) => NewGoalFullScreen(
+                  draft: state.extra is GoalDraft
+                      ? state.extra as GoalDraft
+                      : null,
+                ),
               ),
             ],
           ),
           GoRoute(
             path: '/metrics',
             pageBuilder: (context, state) =>
-                _fadePage(state, const MetricsScreen()),
+                _fadePage(state, const BackToHome(child: MetricsScreen())),
           ),
           GoRoute(
             path: '/profile',
             pageBuilder: (context, state) =>
-                _fadePage(state, const ProfileScreen()),
+                _fadePage(state, const BackToHome(child: ProfileScreen())),
           ),
         ],
       ),
@@ -153,6 +192,14 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.onDispose(() {
     router.dispose();
     loggedIn.dispose();
+    recovering.dispose();
   });
   return router;
 });
+
+DateTimeRange? _historyRange(Uri uri) {
+  final start = DateTime.tryParse(uri.queryParameters['from'] ?? '');
+  final end = DateTime.tryParse(uri.queryParameters['to'] ?? '');
+  if (start == null || end == null || start.isAfter(end)) return null;
+  return DateTimeRange(start: start, end: end);
+}

@@ -17,15 +17,30 @@ import 'history_provider.dart';
 import 'storage_provider.dart';
 
 final financeRepositoryProvider = Provider<FinanceRepository>((ref) {
-  return FinanceRepository(
-    ref.watch(apiClientProvider),
-    ref.watch(authRepositoryProvider),
-  );
+  return FinanceRepository(ref.watch(apiClientProvider));
 });
 
-final dashboardProvider = FutureProvider<DashboardData>((ref) {
+/// Inicio's data. The movements and goals come from their own providers, so
+/// the 13 months of movements are fetched once and shared with the rest of
+/// the app (all `ref.watch`es happen before the first `await`).
+final dashboardProvider = FutureProvider<DashboardData>((ref) async {
   ref.watch(currentUserIdProvider);
-  return ref.watch(financeRepositoryProvider).dashboard();
+  final repository = ref.watch(financeRepositoryProvider);
+  final profile = ref.watch(authRepositoryProvider).profile();
+  final balance = repository.balance();
+  final goals = ref.watch(savingsGoalsProvider.future);
+  final transactions = ref.watch(transactionsProvider(null).future);
+  // They run in parallel: when one fails first (e.g. a 401), the others'
+  // errors must not go unhandled. Awaiting them below still throws.
+  for (final future in [profile, balance, goals, transactions]) {
+    future.ignore();
+  }
+  return DashboardData(
+    user: await profile,
+    balance: await balance,
+    goals: await goals,
+    transactions: await transactions,
+  );
 });
 
 final categoriesProvider = FutureProvider<List<Category>>((ref) {

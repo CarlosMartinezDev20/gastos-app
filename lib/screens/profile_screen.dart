@@ -1,14 +1,17 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/constants/app_constants.dart';
 import '../core/theme/app_palette.dart';
+import '../providers/app_lock_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/onboarding_provider.dart';
 import '../providers/theme_provider.dart';
+import '../widgets/accent_picker.dart';
 import '../widgets/app_states.dart';
 import '../widgets/ios_ui.dart';
-import '../widgets/theme_toggle.dart';
 import '../widgets/theme_crossfade.dart';
 import '../providers/payment_reminders_provider.dart';
 import 'account_sheets.dart';
@@ -33,7 +36,8 @@ class ProfileScreen extends ConsumerWidget {
           );
         }
         final palette = context.palette;
-        final darkMode = ref.watch(isDarkModeProvider);
+        final themeMode = ref.watch(themeControllerProvider);
+        final accent = ref.watch(accentControllerProvider);
         final parts = user.name.trim().split(RegExp(r'\s+'));
         final initials = parts
             .where((p) => p.isNotEmpty)
@@ -41,75 +45,107 @@ class ProfileScreen extends ConsumerWidget {
             .map((p) => p[0])
             .join()
             .toUpperCase();
+        // Opened from the avatar on Inicio (no tab of its own): a back
+        // button like the other pages opened from there.
+        void back() => context.go('/home');
         return CollapsingTitle(
           title: 'Perfil',
+          onBack: back,
           child: ListView(
             physics: const BouncingScrollPhysics(),
-            padding: EdgeInsets.fromLTRB(20, 20, 20, dockClearance(context)),
+            padding: EdgeInsets.fromLTRB(20, 12, 20, dockClearance(context)),
             children: [
-              LargeTitle(title: 'Perfil', trailing: const [ThemeToggle()]),
+              Row(
+                children: [
+                  CircleButton(
+                    icon: CupertinoIcons.chevron_left,
+                    tooltip: 'Volver',
+                    onPressed: back,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const LargeTitle(title: 'Perfil'),
               const SizedBox(height: 20),
-              BentoCard(
-                color: palette.ink,
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 30,
-                      backgroundColor: palette.accent,
-                      child: Text(
-                        initials.isEmpty ? 'U' : initials,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: palette.onAccent,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+              // Centered like the account page of iOS Settings, no card:
+              // a big avatar, name and email.
+              Center(child: InitialsAvatar(initials: initials, size: 88)),
+              const SizedBox(height: 14),
+              Text(
+                user.name,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                user.email,
+                textAlign: TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: palette.muted),
+              ),
+              const SizedBox(height: 14),
+              Center(
+                child: Tooltip(
+                  message: 'Editar nombre',
+                  excludeFromSemantics: true,
+                  child: FilledButton.icon(
+                    onPressed: () => _editName(context, ref, user.name),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 38),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      backgroundColor: palette.card,
+                      foregroundColor: Theme.of(context).colorScheme.onSurface,
+                      textStyle: Theme.of(context).textTheme.labelLarge
+                          ?.copyWith(fontWeight: FontWeight.w600),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            user.name,
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(color: palette.onInk),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            user.email,
-                            style: TextStyle(color: palette.inkMuted),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Editar nombre',
-                      onPressed: () => _editName(context, ref, user.name),
-                      color: palette.onInk,
-                      icon: const Icon(CupertinoIcons.pencil),
-                    ),
-                  ],
+                    icon: const Icon(CupertinoIcons.pencil, size: 16),
+                    label: const Text('Editar nombre'),
+                  ),
                 ),
               ),
               const SizedBox(height: 28),
               InsetGroup(
-                header: 'Preferencias',
+                header: 'Apariencia',
                 children: [
-                  InsetTile(
-                    icon: CupertinoIcons.moon_fill,
-                    iconColor: const Color(0xFF6E56CF),
-                    title: 'Tema oscuro',
-                    trailing: AppSwitch(
-                      value: darkMode,
-                      onChanged: (value) => ThemeCrossfade.run(
-                        context,
-                        () => ref
-                            .read(themeControllerProvider.notifier)
-                            .setDarkMode(value),
-                      ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SegmentedTabs<ThemeMode>(
+                          segments: const {
+                            ThemeMode.light: 'Claro',
+                            ThemeMode.dark: 'Oscuro',
+                            ThemeMode.system: 'Automático',
+                          },
+                          selected: themeMode,
+                          onChanged: (mode) => ThemeCrossfade.run(
+                            context,
+                            () => ref
+                                .read(themeControllerProvider.notifier)
+                                .setMode(mode),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        AccentPicker(
+                          selected: accent,
+                          onChanged: (value) => ThemeCrossfade.run(
+                            context,
+                            () => ref
+                                .read(accentControllerProvider.notifier)
+                                .set(value),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              InsetGroup(
+                header: 'Preferencias',
+                children: [
                   if (ref.watch(paymentReminderServiceProvider).supported)
                     InsetTile(
                       icon: CupertinoIcons.bell_fill,
@@ -135,6 +171,31 @@ class ProfileScreen extends ConsumerWidget {
                         },
                       ),
                     ),
+                  if (ref.watch(biometricAuthProvider).supported)
+                    InsetTile(
+                      icon: Icons.fingerprint,
+                      iconColor: const Color(0xFF0A84FF),
+                      title: 'Bloqueo con huella o rostro',
+                      trailing: AppSwitch(
+                        value: ref.watch(appLockEnabledProvider),
+                        onChanged: (value) async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          final on = await ref
+                              .read(appLockEnabledProvider.notifier)
+                              .set(value);
+                          if (value && !on) {
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'No se activó. Revisa que tu teléfono tenga '
+                                  'huella, rostro o un PIN configurado.',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ),
                   InsetTile(
                     icon: CupertinoIcons.money_dollar_circle_fill,
                     iconColor: const Color(0xFF0E8A5F),
@@ -143,6 +204,21 @@ class ProfileScreen extends ConsumerWidget {
                       'USD',
                       style: TextStyle(color: palette.muted),
                     ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              InsetGroup(
+                header: 'Ayuda',
+                children: [
+                  InsetTile(
+                    icon: CupertinoIcons.sparkles,
+                    iconColor: const Color(0xFFFF9F0A),
+                    title: 'Ver recorrido de la app',
+                    onTap: () {
+                      ref.read(onboardingTourProvider.notifier).request();
+                      context.go('/home');
+                    },
                   ),
                 ],
               ),

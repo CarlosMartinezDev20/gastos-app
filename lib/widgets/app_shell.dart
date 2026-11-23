@@ -1,14 +1,19 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/theme/app_palette.dart';
 import '../core/theme/motion.dart';
+import '../core/utils/onboarding_tour.dart';
 import '../models/category.dart';
 import '../screens/new_transaction_sheet.dart';
 import 'ios_ui.dart';
 import 'offline_banner.dart';
+import 'onboarding_tour.dart';
 
 class _Tab {
   const _Tab(this.path, this.label, this.icon, this.selectedIcon);
@@ -100,10 +105,31 @@ class AppShell extends StatelessWidget {
   }
 }
 
-/// Bottom bar: four destinations around a "+" action, with a lime marker
-/// that slides to the selected tab. On phones it is anchored to the bottom
-/// edge with rounded top corners; on wider screens it floats.
-/// Perfil opens from the avatar on Inicio.
+/// Wraps the pages of the tabs other than Inicio (and Perfil): they're
+/// reached with go(), so there's nothing to pop and the system back would
+/// close the app. It returns to Inicio instead; only Inicio leaves the app.
+///
+/// It must sit inside the shell's own navigator (around the page, not the
+/// shell): with Android's predictive back, that navigator tells the system
+/// whether the app handles back from its top route's [PopScope].
+class BackToHome extends StatelessWidget {
+  const BackToHome({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => PopScope<void>(
+    canPop: false,
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop) context.go(_home.path);
+    },
+    child: child,
+  );
+}
+
+/// Bottom bar, like iOS 26's tab bar: a capsule floating over the content
+/// with four destinations around a "+" action and a gray lens that
+/// slides under the selected tab. Perfil opens from the avatar on Inicio.
 class AppDock extends StatelessWidget {
   const AppDock({super.key, required this.location, required this.onAdd});
 
@@ -111,65 +137,71 @@ class AppDock extends StatelessWidget {
   final VoidCallback onAdd;
 
   static const _tabs = [_home, _history, _goals, _metrics];
-  static const _sidePadding = 8.0;
+  static const _inset = 6.0;
   static const _addSlot = 64.0;
-  static const _floatingMinWidth = 600.0;
-  static const _marker = Size(22, 4);
+
+  /// The tabs the first-run tour points at.
+  static final _tourSpots = {
+    _history.path: TourSpot.history,
+    _goals.path: TourSpot.goals,
+    _metrics.path: TourSpot.analysis,
+  };
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final textScale = MediaQuery.textScalerOf(context).scale(11) / 11;
-    final height = 64.0 + 14.0 * (textScale - 1).clamp(0.0, 2.0);
+    final height = 62.0 + 14.0 * (textScale - 1).clamp(0.0, 2.0);
     final selected = _tabs.indexWhere((tab) => location.startsWith(tab.path));
-    final floating = MediaQuery.sizeOf(context).width >= _floatingMinWidth;
     final duration = Motion.of(context, Motion.slow);
 
-    Widget item(_Tab tab) => Expanded(
-      child: _DockItem(
+    Widget item(_Tab tab) {
+      final dockItem = _DockItem(
         tab: tab,
-        height: height,
+        height: height - _inset * 2,
         selected: location.startsWith(tab.path),
         onTap: () {
           if (location.startsWith(tab.path)) return;
           HapticFeedback.selectionClick();
           context.go(tab.path);
         },
-      ),
-    );
+      );
+      final spot = _tourSpots[tab.path];
+      return Expanded(
+        child: spot == null
+            ? dockItem
+            : TourTarget(spot: spot, child: dockItem),
+      );
+    }
 
     final bar = LayoutBuilder(
       builder: (context, constraints) {
-        final itemWidth =
-            (constraints.maxWidth - _sidePadding * 2 - _addSlot) / 4;
-        final center =
-            _sidePadding +
-            (selected + .5) * itemWidth +
-            (selected >= 2 ? _addSlot : 0);
+        final itemWidth = (constraints.maxWidth - _inset * 2 - _addSlot) / 4;
+        final left =
+            _inset + selected * itemWidth + (selected >= 2 ? _addSlot : 0);
         return Stack(
           children: [
             // Slides with a transform (repaint only, no layout per frame).
             Positioned(
-              top: 0,
+              top: _inset,
+              bottom: _inset,
               left: 0,
-              width: _marker.width,
-              height: _marker.height,
+              width: itemWidth,
               child: TweenAnimationBuilder<double>(
-                tween: Tween(end: center - _marker.width / 2),
+                tween: Tween(end: left),
                 duration: duration,
-                curve: Motion.standard,
-                builder: (context, left, marker) =>
-                    Transform.translate(offset: Offset(left, 0), child: marker),
+                curve: Motion.spring,
+                builder: (context, left, lens) =>
+                    Transform.translate(offset: Offset(left, 0), child: lens),
                 child: AnimatedOpacity(
                   duration: duration,
                   opacity: selected < 0 ? 0 : 1,
+                  // A neutral gray lens, like iOS 26's tab bar.
                   child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: palette.accent,
-                      borderRadius: const BorderRadius.vertical(
-                        bottom: Radius.circular(4),
-                      ),
+                    decoration: ShapeDecoration(
+                      color: palette.fill,
+                      shape: const StadiumBorder(),
                     ),
                   ),
                 ),
@@ -178,7 +210,7 @@ class AppDock extends StatelessWidget {
             Material(
               type: MaterialType.transparency,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: _sidePadding),
+                padding: const EdgeInsets.all(_inset),
                 child: Row(
                   children: [
                     item(_home),
@@ -187,7 +219,10 @@ class AppDock extends StatelessWidget {
                       width: _addSlot,
                       child: Align(
                         heightFactor: 1,
-                        child: _AddButton(onPressed: onAdd),
+                        child: TourTarget(
+                          spot: TourSpot.add,
+                          child: _AddButton(onPressed: onAdd),
+                        ),
                       ),
                     ),
                     item(_goals),
@@ -201,103 +236,171 @@ class AppDock extends StatelessWidget {
       },
     );
 
-    final shadow = BoxShadow(
-      color: Colors.black.withValues(alpha: dark ? .35 : .07),
-      blurRadius: 24,
-      offset: Offset(0, floating ? 8 : -4),
+    // Liquid-glass-like: the page behind is blurred and made more vivid
+    // through a translucent fill with a light rim. On the web (costly blur)
+    // and with high contrast it's a solid bar instead.
+    final glass = false; // EXPERIMENT
+    final shape = StadiumBorder(
+      side: glass ? BorderSide.none : BorderSide(color: palette.hairline),
     );
+    Widget surface = DecoratedBox(
+      decoration: ShapeDecoration(
+        shape: shape,
+        color: glass
+            ? palette.card.withValues(alpha: dark ? .55 : .62)
+            : palette.card,
+      ),
+      child: bar,
+    );
+    if (glass) {
+      surface = ClipPath(
+        clipper: const ShapeBorderClipper(shape: StadiumBorder()),
+        child: BackdropFilter(
+          filter: _glassFilter,
+          child: CustomPaint(
+            // The sheen under the icons, the rim over everything.
+            painter: _GlassRimPainter(dark: dark, sheen: true),
+            foregroundPainter: _GlassRimPainter(dark: dark),
+            child: surface,
+          ),
+        ),
+      );
+    }
 
-    // Solid (no backdrop blur): blurring the page behind the dock on every
-    // scroll frame is expensive, especially on the web.
-    if (floating) {
-      return SafeArea(
-        top: false,
-        minimum: const EdgeInsets.only(bottom: 16),
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Align(
           heightFactor: 1,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 460),
             child: RepaintBoundary(
               child: Container(
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  color: palette.card,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: palette.hairline),
-                  boxShadow: [shadow],
+                height: height,
+                decoration: ShapeDecoration(
+                  shape: shape,
+                  shadows: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: dark ? .45 : .08),
+                      blurRadius: 30,
+                      offset: const Offset(0, 10),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: dark ? .25 : .04),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
                 ),
-                child: bar,
+                child: surface,
               ),
             ),
           ),
         ),
-      );
-    }
-    return RepaintBoundary(
-      child: Container(
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: palette.card,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          border: Border(top: BorderSide(color: palette.hairline)),
-          boxShadow: [shadow],
-        ),
-        child: SafeArea(
-          top: false,
-          minimum: const EdgeInsets.only(bottom: 6),
-          child: bar,
-        ),
       ),
     );
   }
+
+  /// Blur plus extra saturation, so colors behind the glass glow through
+  /// instead of turning grey.
+  static final _glassFilter = ImageFilter.compose(
+    outer: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+    inner: _saturate(1.7),
+  );
+
+  static ColorFilter _saturate(double s) {
+    const r = .2126, g = .7152, b = .0722;
+    return ColorFilter.matrix([
+      r * (1 - s) + s, g * (1 - s), b * (1 - s), 0, 0, //
+      r * (1 - s), g * (1 - s) + s, b * (1 - s), 0, 0, //
+      r * (1 - s), g * (1 - s), b * (1 - s) + s, 0, 0, //
+      0, 0, 0, 1, 0,
+    ]);
+  }
 }
 
-/// Black rounded square with a lime "+"; squeezes and turns when pressed.
-class _AddButton extends StatefulWidget {
+/// The glass's edge: a thin rim lit from the top left that fades toward the
+/// bottom right; with [sheen], a soft light along the top instead.
+class _GlassRimPainter extends CustomPainter {
+  const _GlassRimPainter({required this.dark, this.sheen = false});
+
+  final bool dark;
+  final bool sheen;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final rrect = RRect.fromRectAndRadius(
+      rect.deflate(.5),
+      Radius.circular(size.height / 2),
+    );
+    if (sheen) {
+      canvas.drawRRect(
+        rrect,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.center,
+            colors: [
+              Colors.white.withValues(alpha: dark ? .07 : .35),
+              Colors.white.withValues(alpha: 0),
+            ],
+          ).createShader(rect),
+      );
+      return;
+    }
+    final rim = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: dark
+            ? [
+                Colors.white.withValues(alpha: .32),
+                Colors.white.withValues(alpha: .06),
+                Colors.white.withValues(alpha: .18),
+              ]
+            : [
+                Colors.white.withValues(alpha: .95),
+                Colors.white.withValues(alpha: .35),
+                Colors.black.withValues(alpha: .08),
+              ],
+      ).createShader(rect);
+    canvas.drawRRect(rrect, rim);
+  }
+
+  @override
+  bool shouldRepaint(_GlassRimPainter oldDelegate) =>
+      oldDelegate.dark != dark || oldDelegate.sheen != sheen;
+}
+
+/// Black circle with a lime "+"; squeezes when pressed.
+class _AddButton extends StatelessWidget {
   const _AddButton({required this.onPressed});
 
   final VoidCallback onPressed;
 
   @override
-  State<_AddButton> createState() => _AddButtonState();
-}
-
-class _AddButtonState extends State<_AddButton> {
-  var _pressed = false;
-
-  @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final duration = Motion.of(context, Motion.fast);
-    return Listener(
-      onPointerDown: (_) => setState(() => _pressed = true),
-      onPointerUp: (_) => setState(() => _pressed = false),
-      onPointerCancel: (_) => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? .9 : 1,
-        duration: duration,
-        curve: Motion.standard,
-        child: IconButton(
-          tooltip: 'Registrar movimiento',
-          onPressed: widget.onPressed,
-          style: IconButton.styleFrom(
-            // Black with a lime "+"; lime with a dark "+" in dark mode,
-            // where the pill color is light.
-            backgroundColor: dark ? palette.accent : palette.pill,
-            foregroundColor: dark ? palette.onAccent : palette.accent,
-            fixedSize: const Size.square(50),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(17),
-            ),
-          ),
-          icon: AnimatedRotation(
-            turns: _pressed ? .125 : 0,
-            duration: duration,
-            curve: Motion.standard,
-            child: const Icon(CupertinoIcons.add, size: 24),
-          ),
+    return PressScale(
+      scale: .9,
+      child: IconButton(
+        tooltip: 'Registrar movimiento',
+        onPressed: onPressed,
+        style: IconButton.styleFrom(
+          // Black with a lime "+"; lime with a dark "+" in dark mode,
+          // where the pill color is light.
+          backgroundColor: dark ? palette.accent : palette.pill,
+          foregroundColor: dark ? palette.onAccent : palette.accent,
+          fixedSize: const Size.square(50),
+          shape: const CircleBorder(),
         ),
+        icon: const Icon(CupertinoIcons.add, size: 24),
       ),
     );
   }
@@ -332,9 +435,7 @@ class _DockItem extends StatelessWidget {
         excludeSemantics: true,
         child: InkWell(
           onTap: onTap,
-          customBorder: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          customBorder: const StadiumBorder(),
           splashColor: Colors.transparent,
           highlightColor: Colors.transparent,
           hoverColor: palette.hairline.withValues(alpha: .35),

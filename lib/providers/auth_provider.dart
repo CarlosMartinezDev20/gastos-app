@@ -35,6 +35,19 @@ class SessionRestoreError extends Notifier<ApiException?> {
   void set(ApiException? error) => state = error;
 }
 
+/// True after a password reset link opened the app: the router shows the
+/// "new password" page until it is set (or the user signs out).
+final passwordRecoveryProvider = NotifierProvider<PasswordRecovery, bool>(
+  PasswordRecovery.new,
+);
+
+class PasswordRecovery extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void set(bool value) => state = value;
+}
+
 final authControllerProvider =
     NotifierProvider<AuthController, AsyncValue<UserProfile?>>(
       AuthController.new,
@@ -48,6 +61,17 @@ class AuthController extends Notifier<AsyncValue<UserProfile?>> {
     ref.read(apiClientProvider).onUnauthorized = () {
       if (state.value != null) state = const AsyncData(null);
     };
+    final links = ref.read(authRepositoryProvider).linkEvents.listen((event) {
+      switch (event) {
+        case AuthLinkEvent.passwordRecovery:
+          ref.read(passwordRecoveryProvider.notifier).set(true);
+        case AuthLinkEvent.signedIn:
+          // A confirmation link signed in from the login page; sign-ins
+          // from the form already load the profile themselves.
+          if (!state.isLoading && state.value == null) load();
+      }
+    });
+    ref.onDispose(links.cancel);
     Future.microtask(load);
     return const AsyncLoading();
   }
@@ -62,9 +86,7 @@ class AuthController extends Notifier<AsyncValue<UserProfile?>> {
     try {
       final user = await _repo.profile();
       state = AsyncData(user);
-      await ref
-          .read(themeControllerProvider.notifier)
-          .syncFromProfile(user.darkMode);
+      await syncAppearanceFromProfile(ref, user);
     } catch (error) {
       if (error is ApiException && error.statusCode != 401) {
         // Still loading (the splash), now with the reason and a retry.
@@ -87,9 +109,7 @@ class AuthController extends Notifier<AsyncValue<UserProfile?>> {
     try {
       final session = await _repo.login(email: email, password: password);
       state = AsyncData(session.user);
-      await ref
-          .read(themeControllerProvider.notifier)
-          .syncFromProfile(session.user.darkMode);
+      await syncAppearanceFromProfile(ref, session.user);
     } catch (error, stackTrace) {
       state = AsyncError(error, stackTrace);
       rethrow;
@@ -105,9 +125,7 @@ class AuthController extends Notifier<AsyncValue<UserProfile?>> {
         password: password,
       );
       state = AsyncData(session.user);
-      await ref
-          .read(themeControllerProvider.notifier)
-          .syncFromProfile(session.user.darkMode);
+      await syncAppearanceFromProfile(ref, session.user);
     } catch (error, stackTrace) {
       state = AsyncError(error, stackTrace);
       rethrow;
@@ -122,7 +140,15 @@ class AuthController extends Notifier<AsyncValue<UserProfile?>> {
   Future<void> changePassword(String current, String next) =>
       _repo.changePassword(current: current, next: next);
 
+  /// Saves the password chosen after a reset link and enters the app.
+  Future<void> completePasswordReset(String password) async {
+    await _repo.setNewPassword(password);
+    ref.read(passwordRecoveryProvider.notifier).set(false);
+    await load();
+  }
+
   Future<void> logout() async {
+    ref.read(passwordRecoveryProvider.notifier).set(false);
     ref.read(sessionRestoreErrorProvider.notifier).set(null);
     await _repo.logout();
     state = const AsyncData(null);

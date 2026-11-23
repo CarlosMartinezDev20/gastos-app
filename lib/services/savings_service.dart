@@ -18,6 +18,7 @@ class SavingsService {
     required String icon,
     required String bgColor,
     required String iconColor,
+    DateTime? targetDate,
   }) {
     return _ref
         .read(financeRepositoryProvider)
@@ -27,6 +28,7 @@ class SavingsService {
           icon: icon,
           bgColor: bgColor,
           iconColor: iconColor,
+          targetDate: targetDate,
         );
   }
 
@@ -45,10 +47,17 @@ class SavingsService {
     required String name,
     required double targetAmount,
     required String icon,
+    required DateTime? targetDate,
   }) {
     return _ref
         .read(financeRepositoryProvider)
-        .updateGoal(id, name: name, targetAmount: targetAmount, icon: icon);
+        .updateGoal(
+          id,
+          name: name,
+          targetAmount: targetAmount,
+          icon: icon,
+          targetDate: targetDate,
+        );
   }
 
   Future<void> deleteGoal(String id) {

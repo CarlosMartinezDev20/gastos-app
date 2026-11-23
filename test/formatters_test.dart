@@ -22,4 +22,11 @@ void main() {
       '31 de diciembre 2025',
     );
   });
+
+  test('axisMoney keeps chart labels short', () {
+    expect(Formatters.axisMoney(20), r'$20');
+    expect(Formatters.axisMoney(2.5), r'$2.50');
+    expect(Formatters.axisMoney(1000), r'$1k');
+    expect(Formatters.axisMoney(1500), r'$1.5k');
+  });
 }

@@ -1,3 +1,4 @@
+import '../widgets/money_privacy.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -117,6 +118,7 @@ class _CardPaymentSheetState extends ConsumerState<_CardPaymentSheet> {
                 builder: (context, focusNode) => TextFormField(
                   controller: _amount,
                   focusNode: focusNode,
+                  obscureText: MoneyPrivacyScope.hiddenOf(context),
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
@@ -145,9 +147,7 @@ class _CardPaymentSheetState extends ConsumerState<_CardPaymentSheet> {
                   children: [
                     for (final (label, value) in _suggestions)
                       ActionChip(
-                        label: Text(
-                          '$label · ${Formatters.compactMoney(value)}',
-                        ),
+                        label: Text('$label · ${context.money(value)}'),
                         onPressed: () =>
                             _amount.text = value.toStringAsFixed(2),
                       ),
