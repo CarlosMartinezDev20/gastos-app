@@ -10,6 +10,7 @@ import '../core/auth/auth_gateway.dart';
 import '../core/theme/app_palette.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/ios_ui.dart';
+import '../widgets/miaunero_mark.dart';
 import '../widgets/mascot.dart';
 import '../core/theme/motion.dart';
 
@@ -215,14 +216,12 @@ class _Welcome extends StatelessWidget {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: palette.pill,
+                  // Ink in both modes, like the app icon.
+                  color: palette.ink,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  CupertinoIcons.money_dollar,
-                  color: palette.accent,
-                  size: 22,
-                ),
+                alignment: Alignment.center,
+                child: MiauneroMark(color: palette.accent, size: 24),
               ),
               const SizedBox(width: 10),
               Expanded(

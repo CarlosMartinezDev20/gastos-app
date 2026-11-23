@@ -13,6 +13,7 @@ import '../widgets/app_states.dart';
 import '../widgets/home_cards.dart';
 import '../widgets/ios_ui.dart';
 import '../widgets/mascot.dart';
+import '../widgets/miaunero_mark.dart';
 import '../widgets/onboarding_tour.dart';
 import '../widgets/phone_widget_preview.dart';
 import '../widgets/theme_toggle.dart';
@@ -356,4 +357,26 @@ class _AmountDemoState extends State<_AmountDemo> {
 Widget accentPicker() => Padding(
   padding: const EdgeInsets.all(16),
   child: AccentPicker(selected: AppAccent.violeta, onChanged: (_) {}),
+);
+
+/// The app's mark in the login header tile, at 24 and 48 px.
+@AppPreview(name: 'Logo', group: 'Marca', size: Size(200, 100))
+Widget miauneroMark() => Builder(
+  builder: (context) => Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      for (final size in [24.0, 48.0])
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: Container(
+            padding: EdgeInsets.all(size / 3),
+            decoration: BoxDecoration(
+              color: context.palette.ink,
+              borderRadius: BorderRadius.circular(size / 2),
+            ),
+            child: MiauneroMark(color: context.palette.accent, size: size),
+          ),
+        ),
+    ],
+  ),
 );
