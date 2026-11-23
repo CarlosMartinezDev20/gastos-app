@@ -72,11 +72,13 @@ BODY = (CX - A, CY - B, CX + A, CY + B)  # body box, without the ears
 EAR_TOP = CY - B - 26  # tip of the ears
 
 
-def mark(small=False):
-    body = superellipse_cw(CX, CY, A, B, 3.4)
-    o, t, i = (CX - A + 6, CY - 30), (CX - A + 14, EAR_TOP), (CX - A + 76, CY - B + 4)
+def mark(small=False, a=A, eyes=None):
+    """small: the cut for 40 px or less (bigger eyes). a: half-width of the body (narrower inside the
+    wordmark); eyes: (radius, distance from the centre) to override the cut's eyes."""
+    body = superellipse_cw(CX, CY, a, B, 3.4)
+    o, t, i = (CX - a + 6, CY - 30), (CX - a + 14, EAR_TOP), (CX - a + 76, CY - B + 4)
     ears = ear(o, t, i, 18) + " " + ear(mirror(o), mirror(t), mirror(i), 18)
-    r, dx = (23, 38) if small else (14.5, 32)
+    r, dx = eyes or ((23, 38) if small else (14.5, 32))
     eyes = eye_ccw(CX - dx, 148, r) + " " + eye_ccw(CX + dx, 148, r)
     return f"{body} {ears} {eyes}"
 
@@ -180,8 +182,18 @@ def gbounds(name):
     return bp.bounds
 
 
-def wordmark(ink, mark_color, size=160, tracking=-0.03, text="miaunero", face=None):
+# Inside the wordmark Michi is a bit narrower than the stand-alone mark (as wide as a bold «o», so the word
+# doesn't end in a heavy blot), with the small cut's eyes scaled to it (they still read at 24 px),
+# and it gets extra room after the «r», whose arm would otherwise touch the left ear.
+WORD_A, WORD_EYES, WORD_GAP = 92, (22, 35), 0.035
+
+
+def wordmark(ink, mark_color, size=160, tracking=-0.03, text="miaunero", face=None,
+             face_a=None, face_eyes=None, face_gap=None):
     """face: index of the «o» drawn as the mark (default: the first o)."""
+    face_a = WORD_A if face_a is None else face_a
+    face_eyes = WORD_EYES if face_eyes is None else face_eyes
+    face_gap = WORD_GAP if face_gap is None else face_gap
     face = text.index("o") if face is None else face
     sc = size / UPM
     pen = SVGPathPen(gs)
@@ -198,15 +210,18 @@ def wordmark(ink, mark_color, size=160, tracking=-0.03, text="miaunero", face=No
             x += 0.035 * size  # keep the f's hook off the i's dot
         prev = ch
         if idx == face:
-            bw, bh = BODY[2] - BODY[0], BODY[3] - BODY[1]
+            x += face_gap * size
+            x0b, x1b = CX - face_a, CX + face_a
+            bw, bh = x1b - x0b, BODY[3] - BODY[1]
             s = o_h * 1.02 / bh
             lsb = ob[0] * sc
-            tx = x + lsb - BODY[0] * s
+            tx = x + lsb - x0b * s
             ty = base - ob[3] * sc - o_h * 0.01 - BODY[1] * s
-            sym = f'<path fill="{mark_color}" transform="translate({f(tx)},{f(ty)}) scale({f(s)})" d="{mark(True)}"/>'
+            d = mark(a=face_a, eyes=face_eyes)
+            sym = f'<path fill="{mark_color}" transform="translate({f(tx)},{f(ty)}) scale({f(s)})" d="{d}"/>'
             top = min(top, ty + (EAR_TOP + 5.5) * s)
             bottom = max(bottom, ty + BODY[3] * s)
-            right = tx + BODY[2] * s
+            right = tx + x1b * s
             adv = 2 * lsb + bw * s
         else:
             gs[name].draw(TransformPen(pen, (sc, 0, 0, -sc, x, base)))
